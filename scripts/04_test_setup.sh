@@ -84,7 +84,7 @@ apt-get install -y -qq \
 # Disable AppArmor userns restriction if present (not expected on 22.04,
 # but guarded so harmless if the kernel gains it in a point release)
 if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-    echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+    echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true
 fi
 
 # Fix OpenSSL 3.0.x compatibility (Ubuntu 22.04 lacks -quiet flag, added in 3.2)

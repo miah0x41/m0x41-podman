@@ -43,7 +43,7 @@ case "${ID}" in
 
         # Enable unprivileged user namespaces if restricted
         if [ -f /proc/sys/kernel/unprivileged_userns_clone ]; then
-            echo 1 > /proc/sys/kernel/unprivileged_userns_clone
+            echo 1 > /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || true
         fi
 
         systemctl enable --now snapd.socket 2>/dev/null || true
@@ -146,7 +146,7 @@ cp "${SNAP}/etc/containers/policy.json" /etc/containers/policy.json
 
 # Disable AppArmor userns restriction if present (Ubuntu 24.04+)
 if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-    echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+    echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true
 fi
 
 echo ""
