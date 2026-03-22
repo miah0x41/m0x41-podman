@@ -1,0 +1,17 @@
+# AI assistant instructions
+CLAUDE.md
+.claude/
+
+# Sub-project folders (historical, not part of public release)
+native-build/
+native-build-22/
+rootless-contained/
+rootful/
+rootful-22/
+
+# Build artefacts
+*.snap
+*.snap.xdelta3
+
+# Multi-distro test output
+multi-distro-results.txt

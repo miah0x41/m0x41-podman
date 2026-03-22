@@ -1,0 +1,136 @@
+name: podman-m0x41
+version: "5.8.1"
+summary: Podman container engine (classic confinement)
+description: |
+  Podman v5.8.1 packaged as a classic-confinement snap. Bundles crun
+  (built from source), plus conmon, catatonit, fuse-overlayfs, and
+  slirp4netns from Ubuntu 22.04 packages. Pre-built netavark and
+  aardvark-dns binaries are downloaded from GitHub releases. Built on
+  core22 (glibc 2.35) to maximise cross-distro compatibility.
+
+  To alias as 'podman': sudo snap alias podman-m0x41 podman
+
+base: core22
+confinement: classic
+grade: stable
+
+architectures:
+  - build-on: amd64
+
+apps:
+  podman-m0x41:
+    command: bin/podman-wrapper
+    environment:
+      CONTAINERS_CONF: /snap/podman-m0x41/current/etc/containers/containers.conf
+      CONTAINERS_REGISTRIES_CONF: /snap/podman-m0x41/current/etc/containers/registries.conf
+      CONTAINERS_STORAGE_CONF: /snap/podman-m0x41/current/etc/containers/storage.conf
+
+parts:
+  go:
+    plugin: nil
+    build-packages:
+      - curl
+    override-build: |
+      curl -fsSL https://go.dev/dl/go1.24.2.linux-amd64.tar.gz -o /tmp/go.tar.gz
+      mkdir -p $CRAFT_PART_INSTALL/usr/local
+      tar -C $CRAFT_PART_INSTALL/usr/local -xzf /tmp/go.tar.gz
+      rm /tmp/go.tar.gz
+    prime:
+      - -*
+
+  crun:
+    plugin: nil
+    source: https://github.com/containers/crun.git
+    source-tag: "1.19.1"
+    source-depth: 1
+    build-packages:
+      - autoconf
+      - automake
+      - gcc
+      - libcap-dev
+      - libseccomp-dev
+      - libsystemd-dev
+      - libtool
+      - libyajl-dev
+      - make
+      - pkg-config
+      - python3
+    stage-packages:
+      - libyajl2
+    override-build: |
+      ./autogen.sh
+      ./configure --prefix=/usr
+      make -j$(nproc)
+      make install DESTDIR=$CRAFT_PART_INSTALL
+
+  netavark:
+    plugin: nil
+    build-packages:
+      - curl
+    override-build: |
+      NETAVARK_VERSION="1.14.1"
+      AARDVARK_VERSION="1.14.0"
+      mkdir -p $CRAFT_PART_INSTALL/usr/lib/podman
+      curl -fsSL "https://github.com/containers/netavark/releases/download/v${NETAVARK_VERSION}/netavark.gz" \
+        | gunzip > $CRAFT_PART_INSTALL/usr/lib/podman/netavark
+      curl -fsSL "https://github.com/containers/aardvark-dns/releases/download/v${AARDVARK_VERSION}/aardvark-dns.gz" \
+        | gunzip > $CRAFT_PART_INSTALL/usr/lib/podman/aardvark-dns
+      chmod +x $CRAFT_PART_INSTALL/usr/lib/podman/netavark $CRAFT_PART_INSTALL/usr/lib/podman/aardvark-dns
+
+  podman:
+    plugin: nil
+    source: https://github.com/containers/podman.git
+    source-tag: "v5.8.1"
+    source-depth: 1
+    after: [go]
+    build-packages:
+      - gcc
+      - git
+      - libassuan-dev
+      - libbtrfs-dev
+      - libc6-dev
+      - libdevmapper-dev
+      - libglib2.0-dev
+      - libgpg-error-dev
+      - libgpgme-dev
+      - libprotobuf-dev
+      - libprotobuf-c-dev
+      - libseccomp-dev
+      - libselinux1-dev
+      - libsystemd-dev
+      - make
+      - pkg-config
+    stage-packages:
+      - conmon
+      - catatonit
+      - fuse-overlayfs
+      - slirp4netns
+      - libgpgme11
+      - libseccomp2
+      - libassuan0
+      - iptables
+    override-build: |
+      export PATH=$CRAFT_STAGE/usr/local/go/bin:$PATH
+      export GOPATH=$(mktemp -d)
+      make podman podman-remote rootlessport quadlet -j$(nproc)
+      make docs || true
+      make install.bin PREFIX=/usr DESTDIR=$CRAFT_PART_INSTALL
+      make install.systemd PREFIX=/usr DESTDIR=$CRAFT_PART_INSTALL
+      if [ -d docs/build/man ]; then
+        make install.man PREFIX=/usr DESTDIR=$CRAFT_PART_INSTALL || true
+      fi
+
+  configs:
+    plugin: dump
+    source: snap/
+    organize:
+      containers.conf: etc/containers/containers.conf
+      storage.conf: etc/containers/storage.conf
+      registries.conf: etc/containers/registries.conf
+      policy.json: etc/containers/policy.json
+
+  wrapper:
+    plugin: dump
+    source: scripts/
+    organize:
+      podman-wrapper: bin/podman-wrapper
