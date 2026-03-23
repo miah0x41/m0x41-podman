@@ -3,7 +3,7 @@
 # Run from the host within `newgrp lxd`.
 set -euo pipefail
 
-CONTAINER_NAME="podman-m0x41-build"
+CONTAINER_NAME="m0x41-podman-build"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 

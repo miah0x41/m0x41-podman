@@ -1,4 +1,4 @@
-name: podman-m0x41
+name: m0x41-podman
 version: "5.8.1"
 summary: Podman container engine (classic confinement)
 description: |
@@ -8,7 +8,7 @@ description: |
   aardvark-dns binaries are downloaded from GitHub releases. Built on
   core22 (glibc 2.35) to maximise cross-distro compatibility.
 
-  To alias as 'podman': sudo snap alias podman-m0x41 podman
+  To alias as 'podman': sudo snap alias m0x41-podman podman
 
 base: core22
 confinement: classic
@@ -18,12 +18,12 @@ architectures:
   - build-on: amd64
 
 apps:
-  podman-m0x41:
+  m0x41-podman:
     command: bin/podman-wrapper
     environment:
-      CONTAINERS_CONF: /snap/podman-m0x41/current/etc/containers/containers.conf
-      CONTAINERS_REGISTRIES_CONF: /snap/podman-m0x41/current/etc/containers/registries.conf
-      CONTAINERS_STORAGE_CONF: /snap/podman-m0x41/current/etc/containers/storage.conf
+      CONTAINERS_CONF: /snap/m0x41-podman/current/etc/containers/containers.conf
+      CONTAINERS_REGISTRIES_CONF: /snap/m0x41-podman/current/etc/containers/registries.conf
+      CONTAINERS_STORAGE_CONF: /snap/m0x41-podman/current/etc/containers/storage.conf
 
 parts:
   go:

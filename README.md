@@ -53,7 +53,7 @@ Debian 12, CentOS 9, and Fedora 42 require `iptables` on the host. `netavark` (t
 ### Install from a Local Build
 
 ```bash
-sudo snap install podman-m0x41_5.8.1_amd64.snap --dangerous --classic
+sudo snap install m0x41-podman_5.8.1_amd64.snap --dangerous --classic
 ```
 
 ### Build the Snap Yourself
@@ -68,10 +68,10 @@ This creates an LXD container, builds the snap with `snapcraft --destructive-mod
 
 ### Alias as `podman`
 
-To use `podman` instead of `podman-m0x41`:
+To use `podman` instead of `m0x41-podman`:
 
 ```bash
-sudo snap alias podman-m0x41 podman
+sudo snap alias m0x41-podman podman
 ```
 
 To remove the alias later: `sudo snap unalias podman`
@@ -79,7 +79,7 @@ To remove the alias later: `sudo snap unalias podman`
 ### Run
 
 ```bash
-podman-m0x41 run --rm docker.io/library/alpine echo "hello from snap"
+m0x41-podman run --rm docker.io/library/alpine echo "hello from snap"
 
 # Or, if aliased:
 podman run --rm docker.io/library/alpine echo "hello from snap"

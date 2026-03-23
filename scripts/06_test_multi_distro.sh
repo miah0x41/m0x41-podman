@@ -7,7 +7,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SNAP_FILE="${PROJECT_DIR}/podman-m0x41_5.8.1_amd64.snap"
+SNAP_FILE="${PROJECT_DIR}/m0x41-podman_5.8.1_amd64.snap"
 RESULTS_FILE="${PROJECT_DIR}/multi-distro-results.txt"
 
 # Test counts per tier (must match 05_run_tests.sh)
@@ -116,7 +116,7 @@ test_distro() {
 
         # --- Push files ---
         echo "Pushing snap and scripts..."
-        lxc file push "${SNAP_FILE}" "${container}/root/podman-m0x41_5.8.1_amd64.snap"
+        lxc file push "${SNAP_FILE}" "${container}/root/m0x41-podman_5.8.1_amd64.snap"
         lxc file push "${SCRIPT_DIR}/07_test_setup_multi.sh" "${container}/root/07_test_setup_multi.sh"
         lxc file push "${SCRIPT_DIR}/05_run_tests.sh" "${container}/root/05_run_tests.sh"
         lxc exec "${container}" -- chmod +x /root/07_test_setup_multi.sh /root/05_run_tests.sh

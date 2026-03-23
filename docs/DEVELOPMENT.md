@@ -124,11 +124,11 @@ To change what's bundled or how it's built, edit `snapcraft.yaml`. To test chang
 
 ```bash
 # Rebuild
-/usr/bin/sg lxd -c "lxc delete --force podman-m0x41-build"
+/usr/bin/sg lxd -c "lxc delete --force m0x41-podman-build"
 /usr/bin/sg lxd -c "./scripts/01_launch.sh"
 
 # Test
-/usr/bin/sg lxd -c "lxc delete --force podman-m0x41-test"
+/usr/bin/sg lxd -c "lxc delete --force m0x41-podman-test"
 /usr/bin/sg lxd -c "./scripts/03_test_launch.sh all"
 ```
 

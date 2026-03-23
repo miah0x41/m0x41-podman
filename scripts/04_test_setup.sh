@@ -4,8 +4,8 @@
 # optionally installs Go/BATS/Podman source for tier4 BATS parity tests.
 set -euo pipefail
 
-SNAP="/snap/podman-m0x41/current"
-SNAP_FILE="/root/podman-m0x41_5.8.1_amd64.snap"
+SNAP="/snap/m0x41-podman/current"
+SNAP_FILE="/root/m0x41-podman_5.8.1_amd64.snap"
 TESTUSER="podtest"
 PODMAN_SRC="/opt/podman"
 
@@ -20,7 +20,7 @@ apt-get install -y -qq \
 echo "=== Phase 2: Install snap (classic) ==="
 snap wait system seed.loaded 2>/dev/null || true
 snap install "${SNAP_FILE}" --dangerous --classic
-echo "Installed: $(podman-m0x41 --version)"
+echo "Installed: $(m0x41-podman --version)"
 
 echo "=== Phase 3: Create test user ==="
 if ! id "${TESTUSER}" &>/dev/null; then
@@ -94,7 +94,7 @@ fi
 
 echo ""
 echo "=== Setup complete ==="
-echo "  Snap: $(podman-m0x41 --version)"
+echo "  Snap: $(m0x41-podman --version)"
 echo "  Test user: ${TESTUSER} (uid ${TESTUSER_UID})"
 echo "  Subuids: $(grep "^${TESTUSER}:" /etc/subuid)"
 echo "  Go: $(go version)"

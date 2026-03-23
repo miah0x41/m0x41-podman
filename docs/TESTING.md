@@ -13,7 +13,7 @@ The snap is validated with a four-tier test suite. Each tier builds on the confi
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
 | 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.1 source tree, with `PODMAN` pointed at the snap binary |
 
-All tests in tiers 1-3 run through `snap run podman-m0x41` — the snap's actual entry point, not a bypass of the binary.
+All tests in tiers 1-3 run through `snap run m0x41-podman` — the snap's actual entry point, not a bypass of the binary.
 
 ## Running Tests
 
@@ -60,7 +60,7 @@ Launches LXD containers for five distros in parallel, installs the snap on each,
 
 ```bash
 # Single-distro test container
-/usr/bin/sg lxd -c "lxc exec podman-m0x41-test -- /root/05_run_tests.sh tier2"
+/usr/bin/sg lxd -c "lxc exec m0x41-podman-test -- /root/05_run_tests.sh tier2"
 
 # Multi-distro container
 /usr/bin/sg lxd -c "lxc exec snap-test-22-debian-12 -- /root/05_run_tests.sh tier1"
@@ -69,7 +69,7 @@ Launches LXD containers for five distros in parallel, installs the snap on each,
 ### Interactive Debugging
 
 ```bash
-/usr/bin/sg lxd -c "lxc exec podman-m0x41-test -- bash"
+/usr/bin/sg lxd -c "lxc exec m0x41-podman-test -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-test-22-centos-9 -- bash"
 ```
 

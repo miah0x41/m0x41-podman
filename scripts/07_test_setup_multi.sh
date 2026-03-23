@@ -4,8 +4,8 @@
 # Installs snapd, the snap (classic), creates test user, configures libraries.
 set -euo pipefail
 
-SNAP="/snap/podman-m0x41/current"
-SNAP_FILE="/root/podman-m0x41_5.8.1_amd64.snap"
+SNAP="/snap/m0x41-podman/current"
+SNAP_FILE="/root/m0x41-podman_5.8.1_amd64.snap"
 TESTUSER="podtest"
 
 # ---------- Phase 1: Detect distro ----------
@@ -106,7 +106,7 @@ snap wait system seed.loaded 2>/dev/null || true
 snap install "${SNAP_FILE}" --dangerous --classic
 
 # Verify the binary actually works (catches glibc/lib mismatches)
-if ! podman-m0x41 --version 2>&1; then
+if ! m0x41-podman --version 2>&1; then
     echo "ERROR: snap binary fails to execute — likely glibc or library incompatibility"
     exit 1
 fi
@@ -152,6 +152,6 @@ fi
 echo ""
 echo "=== Setup complete ==="
 echo "  Distro: ${ID} ${VERSION_ID:-rolling}"
-echo "  Snap: $(podman-m0x41 --version 2>&1)"
+echo "  Snap: $(m0x41-podman --version 2>&1)"
 echo "  Test user: ${TESTUSER} (uid ${TESTUSER_UID})"
 echo "  Subuids: $(grep "^${TESTUSER}:" /etc/subuid 2>/dev/null || echo 'not found')"

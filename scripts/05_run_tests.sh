@@ -3,12 +3,12 @@
 # Tests snap-installed Podman via `snap run` (classic confinement).
 # Usage: 05_run_tests.sh [tier1|tier2|tier3|tier4|all]
 #
-# All tests use `podman-m0x41` (i.e. snap run). Classic confinement
+# All tests use `m0x41-podman` (i.e. snap run). Classic confinement
 # means the snap command sees the real host filesystem — no bypass needed.
 set -euo pipefail
 
-SNAP="/snap/podman-m0x41/current"
-PODMAN="podman-m0x41"
+SNAP="/snap/m0x41-podman/current"
+PODMAN="m0x41-podman"
 TESTUSER="podtest"
 TIER="${1:-all}"
 RESULTS_DIR="/tmp/test-results"
@@ -84,7 +84,7 @@ tier1() {
 
     echo "--- conmon resolves inside snap ---"
     CONMON=$(${PODMAN} info --format '{{.Host.Conmon.Path}}' 2>&1) || true
-    if echo "${CONMON}" | grep -q "/snap/podman-m0x41/"; then
+    if echo "${CONMON}" | grep -q "/snap/m0x41-podman/"; then
         pass "conmon resolves inside snap (${CONMON})"
     else
         fail "conmon path '${CONMON}' not inside snap"
