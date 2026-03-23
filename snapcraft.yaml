@@ -1,5 +1,9 @@
 name: m0x41-podman
+title: Podman (m0x41 package)
 version: "5.8.1"
+contact: https://github.com/miah0x41
+source-code: https://github.com/miah0x41/m0x41-podman
+license: Apache-2.0
 summary: Podman container engine (classic confinement)
 description: |
   Podman v5.8.1 packaged as a classic-confinement snap. Bundles crun
