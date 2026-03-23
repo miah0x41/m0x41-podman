@@ -1,12 +1,12 @@
 name: m0x41-podman
-title: Podman (m0x41 package)
+title: Podman (miah0x41 package)
 version: "5.8.1"
 contact: https://github.com/miah0x41
 source-code: https://github.com/miah0x41/m0x41-podman
 license: Apache-2.0
 summary: A tool for managing OCI containers and pods (unofficial package)
 description: |
-  Podman is a daemonless, rootless container engine for developing,
+  _Podman_ is a daemonless, rootless container engine for developing,
   managing, and running OCI containers and pods on Linux. It is a
   drop-in replacement for Docker that does not require a background
   daemon or root privileges.
