@@ -4,13 +4,37 @@ version: "5.8.1"
 contact: https://github.com/miah0x41
 source-code: https://github.com/miah0x41/m0x41-podman
 license: Apache-2.0
-summary: Podman container engine (classic confinement)
+summary: A tool for managing OCI containers and pods (unofficial package)
 description: |
-  Podman v5.8.1 packaged as a classic-confinement snap. Bundles crun
-  (built from source), plus conmon, catatonit, fuse-overlayfs, and
-  slirp4netns from Ubuntu 22.04 packages. Pre-built netavark and
-  aardvark-dns binaries are downloaded from GitHub releases. Built on
-  core22 (glibc 2.35) to maximise cross-distro compatibility.
+  Podman is a daemonless, rootless container engine for developing,
+  managing, and running OCI containers and pods on Linux. It is a
+  drop-in replacement for Docker that does not require a background
+  daemon or root privileges.
+
+  This is an unofficial snap built directly from upstream Podman v5.8.1
+  sources. It bundles all runtime dependencies (crun, conmon, netavark,
+  aardvark-dns, fuse-overlayfs, slirp4netns, catatonit) so no
+  additional host packages are required, except iptables on non-Ubuntu
+  distros (Debian, CentOS, Fedora).
+
+  Rootless networking uses slirp4netns rather than pasta, which is the
+  default in upstream Podman v5.x but is unavailable on the core22
+  (Ubuntu 22.04) base used by this snap. Built on core22 (glibc 2.35)
+  for broad cross-distro compatibility (glibc >= 2.34).
+
+  **Tested distributions (rootless and rootful):**
+
+  * Ubuntu 22.04 — pass (no host packages needed)
+  * Ubuntu 24.04 — pass (no host packages needed)
+  * Debian 12 — pass (requires `apt install iptables`)
+  * CentOS 9 Stream — pass (requires `dnf install iptables-nft`)
+  * Fedora 42 — rootful pass (requires `dnf install iptables-nft`);
+    rootless fails in LXD due to missing setuid on newuidmap
+
+  This snap has been extensively tested across the distributions listed
+  above in both rootless and rootful modes. However, it is provided
+  as-is with no warranty or liability. See the project repository for
+  full test methodology and results.
 
   To alias as 'podman': sudo snap alias m0x41-podman podman
 
