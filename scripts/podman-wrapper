@@ -1,4 +1,87 @@
 #!/bin/bash
 export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# --- First-run and dependency checks (rootless only) ---
+if [ "$(id -u)" -ne 0 ]; then
+    marker_dir="${XDG_DATA_HOME:-$HOME/.local/share}/m0x41-podman"
+    hello_marker="$marker_dir/.hello"
+    deps_marker="$marker_dir/.deps-ok"
+
+    # Detect alias: check if /snap/bin/podman is a symlink to our snap.
+    aliased=false
+    if [ -L /snap/bin/podman ] && readlink /snap/bin/podman 2>/dev/null | grep -q m0x41-podman; then
+        aliased=true
+    fi
+
+    # First-run hello message (shown once).
+    if [ ! -f "$hello_marker" ]; then
+        mkdir -p "$marker_dir" 2>/dev/null
+        echo "" >&2
+        echo "  Welcome to m0x41-podman (Podman v${SNAP_VERSION:-5.8.1})" >&2
+        if [ "$aliased" = false ]; then
+            echo "" >&2
+            echo "  Tip: alias as 'podman' for convenience:" >&2
+            echo "    sudo snap alias m0x41-podman podman" >&2
+        fi
+        touch "$hello_marker" 2>/dev/null
+    fi
+
+    # Dependency checks (skipped if marker matches current snap revision).
+    if [ ! -f "$deps_marker" ] || [ "$(cat "$deps_marker" 2>/dev/null)" != "${SNAP_REVISION:-unknown}" ]; then
+        missing=()
+        command -v newuidmap >/dev/null 2>&1 || missing+=("newuidmap")
+        command -v newgidmap >/dev/null 2>&1 || missing+=("newgidmap")
+        if ! dbus-send --session --dest=org.freedesktop.DBus --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames >/dev/null 2>&1; then
+            missing+=("dbus-user-session")
+        fi
+        /usr/sbin/ldconfig -p 2>/dev/null | grep -q libgpg-error.so || missing+=("libgpg-error")
+
+        if [ ${#missing[@]} -gt 0 ]; then
+            echo "" >&2
+            echo "  WARNING: missing host dependencies: ${missing[*]}" >&2
+            if [ -f /etc/os-release ]; then
+                . /etc/os-release
+                case "${ID}" in
+                    ubuntu|debian)
+                        pkgs=""
+                        for m in "${missing[@]}"; do
+                            case "$m" in
+                                newuidmap|newgidmap) pkgs="$pkgs uidmap" ;;
+                                dbus-user-session)   pkgs="$pkgs dbus-user-session" ;;
+                                libgpg-error)        pkgs="$pkgs libgpg-error0" ;;
+                            esac
+                        done
+                        pkgs=$(echo "$pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+                        echo "  Fix: sudo apt install$pkgs" >&2
+                        ;;
+                    fedora|centos|rocky|almalinux|rhel)
+                        pkgs=""
+                        for m in "${missing[@]}"; do
+                            case "$m" in
+                                newuidmap|newgidmap) pkgs="$pkgs shadow-utils" ;;
+                                dbus-user-session)   pkgs="$pkgs dbus-daemon" ;;
+                                libgpg-error)        pkgs="$pkgs libgpg-error" ;;
+                            esac
+                        done
+                        pkgs=$(echo "$pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+                        echo "  Fix: sudo dnf install$pkgs" >&2
+                        ;;
+                    *)
+                        echo "  Install the missing packages for your distribution." >&2
+                        ;;
+                esac
+            fi
+            echo "" >&2
+            echo "  To suppress this warning:" >&2
+            echo "    mkdir -p $marker_dir && echo ${SNAP_REVISION:-unknown} > $deps_marker" >&2
+            echo "" >&2
+        else
+            # All dependencies present — create marker, skip checks next time.
+            mkdir -p "$marker_dir" 2>/dev/null
+            echo "${SNAP_REVISION:-unknown}" > "$deps_marker" 2>/dev/null
+        fi
+    fi
+fi
+
 exec "$SNAP/usr/bin/podman" "$@"

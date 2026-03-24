@@ -18,7 +18,7 @@ This project exists because there is no official _Podman_ snap, and previous com
 
 ## Distro Compatibility
 
-Tested 2026-03-19. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`.
+Tested 2026-03-19. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`. Rootless mode requires `uidmap` and `dbus-user-session` on the host (provides `newuidmap`/`newgidmap` and the D-Bus user session bus). These are installed by default on Ubuntu Desktop but not on server or minimal installs — run `sudo apt install uidmap dbus-user-session` if missing. Fedora and CentOS also need `libgpg-error` (the snap bundles `libgpgme` but not this dependency).
 
 ### Rootless
 
@@ -85,6 +85,10 @@ m0x41-podman run --rm docker.io/library/alpine echo "hello from snap"
 podman run --rm docker.io/library/alpine echo "hello from snap"
 ```
 
+### First-Run Messages
+
+On the first rootless invocation, the snap prints a welcome message with alias instructions (if not already aliased). If host dependencies are missing, it prints a warning with the exact install command for your distro. See [docs/WRAPPER.md](docs/WRAPPER.md) for full details on what is checked and how to suppress warnings.
+
 ## How This Was Tested
 
 The snap was developed through a structured process, with each stage informing the next:
@@ -117,7 +121,7 @@ LXD VMs provide full kernel isolation (no shared kernel, no nesting flags), whic
 
 ## What's in the Snap
 
-The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host (except `iptables` on non-Ubuntu distros):
+The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host, except `iptables` on non-Ubuntu distros, `uidmap` and `dbus-user-session` for rootless mode, and `libgpg-error` on Fedora/CentOS (see [Distro Compatibility](#distro-compatibility)):
 
 | Component | Version | Source |
 |-----------|---------|--------|
@@ -131,7 +135,7 @@ See [docs/COMPONENTS.md](docs/COMPONENTS.md) for full details including licenses
 
 ## Why Classic Confinement?
 
-Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement is the only path to a functional _Podman_ snap.
+Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement is the only path to a functional _Podman_ snap. Note that `uidmap` and `dbus-user-session` must be installed on the host for rootless mode — they are not bundled in the snap, but accessed directly through classic confinement.
 
 ## Repository Structure and Documentation
 
@@ -143,11 +147,13 @@ docs/
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology and results
   COMPONENTS.md                 # Upstream components, versions, and licenses
+  WRAPPER.md                    # Wrapper script behaviour, messages, and testing
 ```
 
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment setup, prerequisites, script reference
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests, multi-distro methodology, results
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
+- **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper script behaviour, first-run messages, dependency detection, and test results
 
 ## Acknowledgements
 

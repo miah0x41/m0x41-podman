@@ -66,11 +66,29 @@ Launches LXD containers for five distros in parallel, installs the snap on each,
 /usr/bin/sg lxd -c "lxc exec snap-test-22-debian-12 -- /root/05_run_tests.sh tier1"
 ```
 
+### Wrapper Dependency Tests
+
+Validates the wrapper's first-run hello message, dependency detection, marker file logic, and alias tip across five distros. These tests use a minimal container setup that deliberately omits rootless dependencies.
+
+```bash
+# All distros in parallel
+/usr/bin/sg lxd -c "./scripts/08_wrapper_test_launch.sh"
+
+# With cleanup
+/usr/bin/sg lxd -c "./scripts/08_wrapper_test_launch.sh --cleanup"
+
+# Re-run on existing container
+/usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- /root/10_wrapper_tests.sh"
+```
+
+See [WRAPPER.md](WRAPPER.md) for full details on test phases and what each test validates.
+
 ### Interactive Debugging
 
 ```bash
 /usr/bin/sg lxd -c "lxc exec m0x41-podman-test -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-test-22-centos-9 -- bash"
+/usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- bash"
 ```
 
 ## Test Results
@@ -123,6 +141,18 @@ The baseline — all tiers pass against _Podman_ built and installed natively (n
 | 4 | 352/352 pass | Root `BATS` smoke (31) + `Ginkgo` integration (321 specs) |
 | 5 | 544/548 | API v2 tests (4 upstream failures in OCI artifact tests) |
 
+### Wrapper Dependency Detection — Multi-Distro
+
+Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_launch.sh`.
+
+| Distro | Wrapper Tests (19) |
+|--------|--------------------|
+| Ubuntu 22.04 | **19/19 pass** |
+| Ubuntu 24.04 | **19/19 pass** |
+| Debian 12 | **19/19 pass** |
+| CentOS 9 Stream | **19/19 pass** |
+| Fedora 42 | **19/19 pass** |
+
 ## Known Failures
 
 ### `core22` Tier 4: `BATS` `setup_suite` Abort (`skopeo` Too Old)
@@ -142,6 +172,14 @@ All three are snap-specific environment conflicts, not functional regressions. T
 ### Fedora 42: Rootless Failures in LXD
 
 `newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 6 tests.
+
+### Rootless Requires Host `uidmap` and `dbus-user-session`
+
+The snap does not bundle `uidmap` (`newuidmap`/`newgidmap`) or `dbus-user-session` — these must exist on the host and are accessed through classic confinement. `uidmap` provides the setuid binaries for user namespace creation; `dbus-user-session` provides the D-Bus user session bus needed by `loginctl enable-linger` and rootless Podman for `XDG_RUNTIME_DIR`. Ubuntu Desktop installs both by default, but server, minimal, and container images do not. Without them, rootless operations fail. Install with `sudo apt install uidmap dbus-user-session` (Debian/Ubuntu) or `sudo dnf install shadow-utils` (Fedora/CentOS).
+
+### Fedora/CentOS Requires Host `libgpg-error`
+
+The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and CentOS this must be installed on the host: `sudo dnf install libgpg-error`. On Debian/Ubuntu it is typically already present.
 
 ### Non-Ubuntu Distros: Rootful Requires Host `iptables`
 

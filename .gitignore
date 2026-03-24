@@ -15,3 +15,7 @@ rootful-22/
 
 # Multi-distro test output
 multi-distro-results.txt
+
+# Scratch files
+text.txt
+post.txt
