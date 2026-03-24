@@ -12,15 +12,15 @@ description: |
   daemon or root privileges.
 
   This is an unofficial snap built directly from upstream Podman v5.8.1
-  sources. It bundles all runtime dependencies (crun, conmon, netavark,
-  aardvark-dns, fuse-overlayfs, slirp4netns, catatonit) so no
-  additional host packages are required, except iptables on non-Ubuntu
+  sources. It bundles all runtime dependencies (`crun`, `conmon`, `netavark`,
+  `aardvark-dns`, `fuse-overlayfs`, `slirp4netns`, `catatonit`) so no
+  additional host packages are required, except `iptables` on non-Ubuntu
   distros (Debian, CentOS, Fedora).
 
-  Rootless networking uses slirp4netns rather than pasta, which is the
-  default in upstream Podman v5.x but is unavailable on the core22
-  (Ubuntu 22.04) base used by this snap. Built on core22 (glibc 2.35)
-  for broad cross-distro compatibility (glibc >= 2.34).
+  Rootless networking uses `slirp4netns` rather than `pasta`, which is the
+  default in upstream Podman v5.x but is unavailable on the `core22`
+  (Ubuntu 22.04) base used by this snap. Built on `core22` (`glibc` 2.35)
+  for broad cross-distro compatibility (`glibc` >= 2.34).
 
   **Tested distributions (rootless and rootful):**
 
@@ -29,7 +29,7 @@ description: |
   * Debian 12 — pass (requires `apt install iptables`)
   * CentOS 9 Stream — pass (requires `dnf install iptables-nft`)
   * Fedora 42 — rootful pass (requires `dnf install iptables-nft`);
-    rootless fails in LXD due to missing setuid on newuidmap
+    rootless fails in LXD due to missing setuid on `newuidmap`
 
   This snap has been extensively tested across the distributions listed
   above in both rootless and rootful modes. However, it is provided
