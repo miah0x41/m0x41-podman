@@ -116,8 +116,8 @@ Tested 2026-03-24 on WSL2. All distros run in parallel via `06_test_multi_distro
 | Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 16/16 |
 | Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 16/16 |
 | Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 16/16 |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 12/16 |
-| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 12/16 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 15/16 |
+| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 14/16 |
 
 ### Native Build (Ubuntu 24.04, VM)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 # --- First-run and dependency checks (rootless only) ---
 if [ "$(id -u)" -ne 0 ]; then

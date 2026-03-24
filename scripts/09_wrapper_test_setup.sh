@@ -125,7 +125,7 @@ TESTUSER_UID=$(id -u "${TESTUSER}")
 echo "=== Phase 6: Configure libraries and policy ==="
 
 # Register snap's bundled libraries with the system linker.
-echo "${SNAP}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
+printf '%s\n' "${SNAP}/usr/lib/x86_64-linux-gnu" "${SNAP}/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
 ldconfig
 
 # Place policy.json at the standard system location.

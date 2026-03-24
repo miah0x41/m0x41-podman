@@ -146,7 +146,7 @@ Tested 2026-03-24 on WSL2.
 | Ubuntu 22.04 | 7/7 | 8/8 | 6/6 | 16/16 |
 | Ubuntu 24.04 | 7/7 | 8/8 | 6/6 | 16/16 |
 | Debian 12 | 7/7 | 8/8 | 6/6 | 16/16 |
-| CentOS 9 | 7/7 | 8/8 | 6/6 | 12/16 |
-| Fedora 42 | 5/7 | 1/8 | 6/6 | 12/16 |
+| CentOS 9 | 7/7 | 8/8 | 6/6 | 15/16 |
+| Fedora 42 | 5/7 | 1/8 | 6/6 | 14/16 |
 
-CentOS 9 and Fedora 42 tier 5 failures are rootless Quadlet tests — same underlying `newuidmap` setuid limitation in LXD containers that affects tier 2.
+CentOS 9 and Fedora 42 tier 5 failures are rootless Quadlet tests — same underlying `newuidmap` setuid / `dbus-user-session` limitation in LXD containers that affects tier 2. Rootful Quadlet passes on all distros.
