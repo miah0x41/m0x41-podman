@@ -10,9 +10,9 @@ The wrapper prepends the snap's binary and library directories to `PATH` and `LD
 
 ### 2. First-Run Hello Message
 
-On the first rootless invocation, the wrapper prints a welcome message to stderr:
+On the first _rootless_ invocation, the wrapper prints a welcome message to `stderr`:
 
-```
+```bash
   Welcome to m0x41-podman (Podman v5.8.1)
 
   Tip: alias as 'podman' for convenience:
@@ -25,9 +25,9 @@ On the first rootless invocation, the wrapper prints a welcome message to stderr
 
 ### 3. Dependency Detection
 
-The snap cannot bundle certain host dependencies that require setuid bits, system services, or shared libraries loaded by processes outside the snap's control. On each rootless invocation, the wrapper checks for these and prints a warning if any are missing:
+The snap cannot bundle certain host dependencies that require `setuid` bits, system services, or shared libraries loaded by processes outside the snap's control. On each _rootless_ invocation, the wrapper checks for these and prints a warning if any are missing:
 
-```
+```bash
   WARNING: missing host dependencies: newuidmap newgidmap dbus-user-session
 
   Fix: sudo apt install dbus-user-session uidmap
@@ -79,7 +79,7 @@ The exact command is printed as part of the warning message. The snap revision (
 
 ## Root Behaviour
 
-The entire first-run and dependency check block is skipped when running as root (`uid 0`). Rootful _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is checked only in rootless context to avoid false positives when the library is present but `ldconfig` isn't in the non-root user's PATH.
+The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is checked only in _rootless_ context to avoid false positives when the library is present but `ldconfig` isn't in the non-root user's PATH.
 
 ## Testing
 
