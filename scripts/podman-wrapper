@@ -1,4 +1,52 @@
 #!/bin/bash
 export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# Detect missing host dependencies for rootless mode.
+if [ "$(id -u)" -ne 0 ]; then
+    missing=()
+    command -v newuidmap >/dev/null 2>&1 || missing+=("newuidmap")
+    command -v newgidmap >/dev/null 2>&1 || missing+=("newgidmap")
+    if ! dbus-send --session --dest=org.freedesktop.DBus --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames >/dev/null 2>&1; then
+        missing+=("dbus-user-session")
+    fi
+    ldconfig -p 2>/dev/null | grep -q libgpg-error.so || missing+=("libgpg-error")
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "m0x41-podman: missing host dependencies: ${missing[*]}" >&2
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            case "${ID}" in
+                ubuntu|debian)
+                    pkgs=""
+                    for m in "${missing[@]}"; do
+                        case "$m" in
+                            newuidmap|newgidmap) pkgs="$pkgs uidmap" ;;
+                            dbus-user-session)   pkgs="$pkgs dbus-user-session" ;;
+                            libgpg-error)        pkgs="$pkgs libgpg-error0" ;;
+                        esac
+                    done
+                    pkgs=$(echo "$pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+                    echo "  Fix: sudo apt install$pkgs" >&2
+                    ;;
+                fedora|centos|rocky|almalinux|rhel)
+                    pkgs=""
+                    for m in "${missing[@]}"; do
+                        case "$m" in
+                            newuidmap|newgidmap) pkgs="$pkgs shadow-utils" ;;
+                            dbus-user-session)   pkgs="$pkgs dbus-daemon" ;;
+                            libgpg-error)        pkgs="$pkgs libgpg-error" ;;
+                        esac
+                    done
+                    pkgs=$(echo "$pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+                    echo "  Fix: sudo dnf install$pkgs" >&2
+                    ;;
+                *)
+                    echo "  Install the missing packages for your distribution." >&2
+                    ;;
+            esac
+        fi
+    fi
+fi
+
 exec "$SNAP/usr/bin/podman" "$@"
