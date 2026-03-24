@@ -17,17 +17,18 @@ fail() { echo "  FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 FAILURES=0
 
 run_as_testuser() {
-    local cmd="$1" stderr_file="${2:-}"
+    local cmd="$1" output_file="${2:-}"
     local uid
     uid=$(id -u "${TESTUSER}")
     mkdir -p "/run/user/${uid}"
     chown "${TESTUSER}:${TESTUSER}" "/run/user/${uid}"
-    if [ -n "${stderr_file}" ]; then
-        # Redirect stderr OUTSIDE su so we capture snap launcher + wrapper output
+    if [ -n "${output_file}" ]; then
+        # Capture ALL output (stdout + stderr merged) so we catch wrapper
+        # messages regardless of how snapd routes file descriptors.
         su - "${TESTUSER}" -c "
             export XDG_RUNTIME_DIR=/run/user/${uid}
             ${cmd}
-        " 2>"${stderr_file}"
+        " >"${output_file}" 2>&1
     else
         su - "${TESTUSER}" -c "
             export XDG_RUNTIME_DIR=/run/user/${uid}
