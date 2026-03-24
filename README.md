@@ -18,7 +18,7 @@ This project exists because there is no official _Podman_ snap, and previous com
 
 ## Distro Compatibility
 
-Tested 2026-03-19. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`. Rootless mode requires `uidmap` and `dbus-user-session` on the host (provides `newuidmap`/`newgidmap` and the D-Bus user session bus). These are installed by default on Ubuntu Desktop but not on server or minimal installs — run `sudo apt install uidmap dbus-user-session` if missing. Fedora and CentOS also need `libgpg-error` (the snap bundles `libgpgme` but not this dependency).
+Tested 2026-03-19. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`. Rootless mode requires `uidmap` and `dbus-user-session` on the host (provides `newuidmap`/`newgidmap` and the D-Bus user session bus). These are installed by default on Ubuntu Desktop but not on server or minimal installs — run `sudo apt install uidmap dbus-user-session` if missing. The snap's install hook automatically configures library paths, systemd generators, and places `podman` on PATH.
 
 ### Rootless
 
@@ -133,7 +133,7 @@ LXD VMs provide full kernel isolation (no shared kernel, no nesting flags), whic
 
 ## What's in the Snap
 
-The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host, except `iptables` on non-Ubuntu distros, `uidmap` and `dbus-user-session` for rootless mode, and `libgpg-error` on Fedora/CentOS (see [Distro Compatibility](#distro-compatibility)):
+The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host, except `iptables` on non-Ubuntu distros and `uidmap` + `dbus-user-session` for rootless mode (see [Distro Compatibility](#distro-compatibility)):
 
 | Component | Version | Source |
 |-----------|---------|--------|

@@ -45,14 +45,15 @@ The checks are:
 | `command -v newuidmap` | `uidmap` package missing | Requires setuid bit — stripped during snap packing |
 | `command -v newgidmap` | `uidmap` package missing | Same as above |
 | `dbus-send --session` | `dbus-user-session` missing or no session bus | Requires a running system service |
-| `/usr/sbin/ldconfig -p \| grep libgpg-error` | `libgpg-error` library missing | Loaded by processes outside the snap's `LD_LIBRARY_PATH` |
+
+Note: `libgpg-error` was previously checked here but is now handled by the install hook's `ldconfig` registration and no longer appears in the wrapper's dependency checks.
 
 The install command adapts to the distro:
 
 | Distro | Package Manager | Packages |
 |--------|-----------------|----------|
-| Ubuntu / Debian | `apt` | `uidmap`, `dbus-user-session`, `libgpg-error0` |
-| Fedora / CentOS / RHEL | `dnf` | `shadow-utils`, `dbus-daemon`, `libgpg-error` |
+| Ubuntu / Debian | `apt` | `uidmap`, `dbus-user-session` |
+| Fedora / CentOS / RHEL | `dnf` | `shadow-utils`, `dbus-daemon` |
 
 ## Marker Files
 
