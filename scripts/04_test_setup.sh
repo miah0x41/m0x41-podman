@@ -31,17 +31,22 @@ fi
 
 TESTUSER_UID=$(id -u "${TESTUSER}")
 
-echo "=== Phase 4: Configure libraries and policy ==="
-# Register snap's bundled libraries (libyajl, libslirp) with the system
-# linker. The wrapper sets LD_LIBRARY_PATH for podman itself, but child
-# processes (conmon → crun) don't inherit it.
-echo "${SNAP}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
-ldconfig
-
-# Classic confinement sees the host filesystem, so place policy.json
-# at the standard system location.
-mkdir -p /etc/containers
-cp "${SNAP}/etc/containers/policy.json" /etc/containers/policy.json
+echo "=== Phase 4: Verify install hook artefacts ==="
+# The snap install hook (snap/hooks/install) should have created these
+# automatically during snap install. Verify rather than duplicate.
+HOOK_OK=true
+test -f /usr/local/bin/podman && echo "  Shim: OK" || { echo "  WARNING: /usr/local/bin/podman shim missing"; HOOK_OK=false; }
+test -L /usr/lib/systemd/system-generators/podman-system-generator && echo "  System generator: OK" || { echo "  WARNING: system generator symlink missing"; HOOK_OK=false; }
+test -L /usr/lib/systemd/user-generators/podman-user-generator && echo "  User generator: OK" || { echo "  WARNING: user generator symlink missing"; HOOK_OK=false; }
+test -f /etc/containers/policy.json && echo "  policy.json: OK" || { echo "  WARNING: policy.json missing"; HOOK_OK=false; }
+test -f /etc/ld.so.conf.d/podman-snap.conf && echo "  ldconfig conf: OK" || { echo "  WARNING: ldconfig conf missing"; HOOK_OK=false; }
+if [ "${HOOK_OK}" = false ]; then
+    echo "  Install hook may have failed — falling back to manual setup"
+    echo "${SNAP}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
+    ldconfig
+    mkdir -p /etc/containers
+    cp "${SNAP}/etc/containers/policy.json" /etc/containers/policy.json
+fi
 
 echo "=== Phase 5: Install tier4 dependencies (Go, BATS, Podman source) ==="
 # Go
