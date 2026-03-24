@@ -55,7 +55,10 @@ case "${ID}" in
 
     fedora)
         dnf install -y snapd 2>&1 | tail -5
-        # No shadow-utils, no libgpg-error, no iptables-nft
+        # libgpg-error is a hard dependency — the snap binary won't load without it.
+        # This is NOT a rootless dep; it's required for any mode.
+        dnf install -y libgpg-error 2>&1 | tail -3
+        # No shadow-utils, no iptables-nft
 
         setenforce 0 2>/dev/null || true
         ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
@@ -69,7 +72,9 @@ case "${ID}" in
     centos|rocky|almalinux|rhel)
         dnf install -y epel-release 2>&1 | tail -3
         dnf install -y snapd 2>&1 | tail -5
-        # No shadow-utils, no libgpg-error, no iptables-nft
+        # libgpg-error is a hard dependency — the snap binary won't load without it.
+        dnf install -y libgpg-error 2>&1 | tail -3
+        # No shadow-utils, no iptables-nft
 
         setenforce 0 2>/dev/null || true
         ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
@@ -147,10 +152,10 @@ case "${ID}" in
         apt-get install -y -qq uidmap dbus-user-session 2>&1 | tail -5
         ;;
     fedora)
-        dnf install -y shadow-utils libgpg-error 2>&1 | tail -3
+        dnf install -y shadow-utils 2>&1 | tail -3
         ;;
     centos|rocky|almalinux|rhel)
-        dnf install -y shadow-utils libgpg-error 2>&1 | tail -3
+        dnf install -y shadow-utils 2>&1 | tail -3
         ;;
 esac
 echo "Dependencies installed."

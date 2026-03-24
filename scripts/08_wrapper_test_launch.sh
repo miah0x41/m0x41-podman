@@ -10,7 +10,7 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SNAP_FILE="${PROJECT_DIR}/m0x41-podman_5.8.1_amd64.snap"
 RESULTS_FILE="${PROJECT_DIR}/wrapper-test-results.txt"
 
-WRAPPER_TEST_COUNT=20
+WRAPPER_TEST_COUNT=19
 
 # Parse args
 CLEANUP=false
