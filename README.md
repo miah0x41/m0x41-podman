@@ -66,28 +66,40 @@ Requires LXD. The build runs inside an LXD container — no root access needed o
 
 This creates an LXD container, builds the snap with `snapcraft --destructive-mode`, and pulls the `.snap` file back to the host.
 
-### Alias as `podman`
-
-To use `podman` instead of `m0x41-podman`:
-
-```bash
-sudo snap alias m0x41-podman podman
-```
-
-To remove the alias later: `sudo snap unalias podman`
-
 ### Run
 
-```bash
-m0x41-podman run --rm docker.io/library/alpine echo "hello from snap"
+The snap's install hook creates `/usr/local/bin/podman`, so `podman` is immediately available on PATH:
 
-# Or, if aliased:
+```bash
 podman run --rm docker.io/library/alpine echo "hello from snap"
 ```
 
+Alternatively, use the full snap command name: `m0x41-podman run ...`
+
+### Quadlet (Systemd Integration)
+
+Quadlet is supported out of the box. The install hook registers the systemd generators automatically. Create a `.container` file and reload:
+
+```bash
+sudo mkdir -p /etc/containers/systemd
+sudo tee /etc/containers/systemd/my-app.container <<EOF
+[Container]
+Image=docker.io/library/nginx
+PublishPort=8080:80
+
+[Install]
+WantedBy=default.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl start my-app.service
+```
+
+See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, and limitations.
+
 ### First-Run Messages
 
-On the first rootless invocation, the snap prints a welcome message with alias instructions (if not already aliased). If host dependencies are missing, it prints a warning with the exact install command for your distro. See [docs/WRAPPER.md](docs/WRAPPER.md) for full details on what is checked and how to suppress warnings.
+On the first rootless invocation via `m0x41-podman`, the snap prints a welcome message. If host dependencies are missing, it prints a warning with the exact install command for your distro. See [docs/WRAPPER.md](docs/WRAPPER.md) for full details.
 
 ## How This Was Tested
 
@@ -142,18 +154,22 @@ Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host'
 ```
 snapcraft.yaml                  # Snap definition (core22, classic confinement)
 snap/                           # Bundled container engine configuration
+  hooks/install                 # Install hook (shim, generators, ldconfig, policy.json)
+  hooks/remove                  # Remove hook (cleanup)
 scripts/                        # Build, test, and multi-distro automation
 docs/
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology and results
   COMPONENTS.md                 # Upstream components, versions, and licenses
   WRAPPER.md                    # Wrapper script behaviour, messages, and testing
+  QUADLET.md                    # Quadlet (systemd integration) and install hooks
 ```
 
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment setup, prerequisites, script reference
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests, multi-distro methodology, results
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
 - **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper script behaviour, first-run messages, dependency detection, and test results
+- **[docs/QUADLET.md](docs/QUADLET.md)** — Quadlet support, install/remove hooks, shim vs wrapper, and test results
 
 ## Acknowledgements
 

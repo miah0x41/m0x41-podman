@@ -4,7 +4,7 @@ This document covers the test methodology, how to run tests, and recorded result
 
 ## Test Tiers
 
-The snap is validated with a four-tier test suite. Each tier builds on the confidence established by the previous one.
+The snap is validated with a five-tier test suite. Each tier builds on the confidence established by the previous one.
 
 | Tier | Name | Tests | What It Validates |
 |------|------|-------|-------------------|
@@ -12,8 +12,9 @@ The snap is validated with a four-tier test suite. Each tier builds on the confi
 | 2 | Rootless Functional | 8 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping — all as an unprivileged user |
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
 | 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.1 source tree, with `PODMAN` pointed at the snap binary |
+| 5 | Quadlet / Install Hook | 16+ | Install hook artefacts, Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS quadlet tests (gated), Go e2e quadlet tests (gated) |
 
-All tests in tiers 1-3 run through `snap run m0x41-podman` — the snap's actual entry point, not a bypass of the binary.
+All tests in tiers 1-3 run through `snap run m0x41-podman` — the snap's actual entry point, not a bypass of the binary. Tier 5 tests the `/usr/local/bin/podman` shim created by the install hook.
 
 ## Running Tests
 

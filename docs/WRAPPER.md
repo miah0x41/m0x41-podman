@@ -19,9 +19,11 @@ On the first _rootless_ invocation, the wrapper prints a welcome message to `std
     sudo snap alias m0x41-podman podman
 ```
 
-- The alias tip is suppressed if `/snap/bin/podman` already symlinks to `m0x41-podman` (i.e. the alias is set).
+- The alias tip is suppressed if `/snap/bin/podman` already symlinks to `m0x41-podman` (i.e. the snap alias is set) or if `/usr/local/bin/podman` exists with the snap's marker comment (i.e. the install hook's shim is in place). Since the install hook always creates the shim, the alias tip is effectively never shown after a normal installation.
 - The message is shown once. A marker file at `~/.local/share/m0x41-podman/.hello` prevents it from appearing again.
 - Root invocations never see this message.
+
+**Note:** The wrapper is the entry point for `snap run m0x41-podman` (interactive use). The `/usr/local/bin/podman` shim created by the install hook is a separate, minimal entry point used by systemd and scripts. See [QUADLET.md](QUADLET.md) for details on the shim.
 
 ### 3. Dependency Detection
 
