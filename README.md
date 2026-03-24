@@ -135,7 +135,7 @@ See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro result
 
 ## Why Classic Confinement?
 
-Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement also enables the install hook to register systemd generators for Quadlet and place the `podman` shim on PATH — operations that strict confinement does not permit.
+Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement also enables the install hook to register systemd generators for Quadlet and place the `podman` shim on PATH — operations that strict confinement does not permit. See [CLASSIC_CONFINEMENT.md](CLASSIC_CONFINEMENT.md) for the full technical justification and evaluation of existing snapd interfaces.
 
 ## Repository Structure and Documentation
 
