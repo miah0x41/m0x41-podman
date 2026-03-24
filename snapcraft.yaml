@@ -15,7 +15,10 @@ description: |
   sources. It bundles all runtime dependencies (`crun`, `conmon`, `netavark`,
   `aardvark-dns`, `fuse-overlayfs`, `slirp4netns`, `catatonit`) so no
   additional host packages are required, except `iptables` on non-Ubuntu
-  distros (Debian, CentOS, Fedora).
+  distros (Debian, CentOS, Fedora). Rootless mode requires `uidmap` and
+  `dbus-user-session` on the host (installed by default on Ubuntu Desktop,
+  but not on server or minimal installs). Fedora and CentOS also need
+  `libgpg-error` (the snap bundles `libgpgme` but not this dependency).
 
   Rootless networking uses `slirp4netns` rather than `pasta`, which is the
   default in upstream Podman v5.x but is unavailable on the `core22`
@@ -24,11 +27,11 @@ description: |
 
   **Tested distributions (rootless and rootful):**
 
-  * Ubuntu 22.04 — pass (no host packages needed)
-  * Ubuntu 24.04 — pass (no host packages needed)
-  * Debian 12 — pass (requires `apt install iptables`)
-  * CentOS 9 Stream — pass (requires `dnf install iptables-nft`)
-  * Fedora 42 — rootful pass (requires `dnf install iptables-nft`);
+  * Ubuntu 22.04 — pass (`apt install uidmap dbus-user-session`)
+  * Ubuntu 24.04 — pass (`apt install uidmap dbus-user-session`)
+  * Debian 12 — pass (`apt install uidmap dbus-user-session iptables`)
+  * CentOS 9 Stream — pass (`dnf install shadow-utils libgpg-error iptables-nft`)
+  * Fedora 42 — rootful pass (`dnf install shadow-utils libgpg-error iptables-nft`);
     rootless fails in LXD due to missing setuid on `newuidmap`
 
   This snap has been extensively tested across the distributions listed

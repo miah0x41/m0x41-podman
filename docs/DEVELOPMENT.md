@@ -102,6 +102,14 @@ _Podman_ v5.8.1 defaults to `pasta` for rootless networking, but `passt` was add
 
 The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmon`, which then spawns `crun`, the library path is lost. The snap bundles `libyajl` (required by `crun`), but `crun` can't find it at runtime. Fix: register the snap's library directory system-wide via `ldconfig` during setup.
 
+### `uidmap` and `dbus-user-session` Required on Host for Rootless
+
+The `uidmap` package (provides `newuidmap`/`newgidmap`) and `dbus-user-session` are not bundled in the snap — they must exist on the host and are accessed through classic confinement. `uidmap` provides setuid binaries for user namespace creation; `dbus-user-session` provides the D-Bus user session bus needed for `XDG_RUNTIME_DIR` and rootless session management. Ubuntu Desktop includes both by default, but server installs, minimal images, and LXD containers do not. If a user removes the apt-installed `podman`, `uidmap` is auto-removed with it. Rootless will fail until it is reinstalled.
+
+### `libgpg-error` Required on Fedora/CentOS
+
+The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and CentOS this library must be present on the host (`dnf install libgpg-error`). On Debian/Ubuntu it is typically already installed as a dependency of other system packages.
+
 ### `iptables` Not Found on Non-Ubuntu Hosts
 
 `netavark` calls `iptables` as a child process of `conmon`. On Ubuntu, `iptables` is always present. On Debian 12, CentOS 9, and Fedora 42 (which use `nftables` natively), `iptables` must be installed on the host. The `nftables` driver (`firewall_driver = "nftables"`) was attempted but fails in LXD on WSL2 due to missing kernel modules.
