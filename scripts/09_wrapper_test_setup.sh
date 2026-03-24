@@ -150,6 +150,8 @@ case "${ID}" in
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
         apt-get install -y -qq uidmap dbus-user-session 2>&1 | tail -5
+        # Refresh ldconfig cache after installing packages
+        ldconfig
         ;;
     fedora)
         dnf install -y shadow-utils 2>&1 | tail -3
