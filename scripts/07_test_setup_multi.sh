@@ -141,7 +141,7 @@ test -f /etc/containers/policy.json && echo "  policy.json: OK" || { echo "  WAR
 test -f /etc/ld.so.conf.d/podman-snap.conf && echo "  ldconfig conf: OK" || { echo "  WARNING: ldconfig conf missing"; HOOK_OK=false; }
 if [ "${HOOK_OK}" = false ]; then
     echo "  Install hook may have failed — falling back to manual setup"
-    echo "${SNAP}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
+    printf '%s\n' "${SNAP}/usr/lib/x86_64-linux-gnu" "${SNAP}/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
     ldconfig
     mkdir -p /etc/containers
     cp "${SNAP}/etc/containers/policy.json" /etc/containers/policy.json

@@ -16,7 +16,7 @@ cat > /usr/local/bin/podman <<'SHIM'
 # m0x41-podman shim — do not edit (managed by snap install hook)
 SNAP=/snap/m0x41-podman/current
 export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CONTAINERS_CONF="$SNAP/etc/containers/containers.conf"
 export CONTAINERS_REGISTRIES_CONF="$SNAP/etc/containers/registries.conf"
 export CONTAINERS_STORAGE_CONF="$SNAP/etc/containers/storage.conf"
@@ -45,7 +45,10 @@ fi
 # ---------- 3. Register snap libraries with ldconfig ----------
 # Child processes (conmon → crun) don't inherit LD_LIBRARY_PATH from
 # the wrapper or shim. Register the snap's library directory system-wide.
-echo "${SNAP_CURRENT}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
+cat > /etc/ld.so.conf.d/podman-snap.conf <<EOF
+${SNAP_CURRENT}/usr/lib/x86_64-linux-gnu
+${SNAP_CURRENT}/lib/x86_64-linux-gnu
+EOF
 ldconfig
 
 # ---------- 4. Install policy.json ----------

@@ -137,6 +137,7 @@ parts:
       - conmon
       - catatonit
       - fuse-overlayfs
+      - libfuse3-3
       - slirp4netns
       - libgpgme11
       - libseccomp2
