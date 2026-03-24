@@ -5,12 +5,18 @@
 # Expects 09_wrapper_test_setup.sh to have run first (minimal setup, no deps).
 set -euo pipefail
 
-PODMAN="m0x41-podman"
 TESTUSER="podtest"
 MARKER_DIR="/home/${TESTUSER}/.local/share/m0x41-podman"
 HELLO_MARKER="${MARKER_DIR}/.hello"
 DEPS_MARKER="${MARKER_DIR}/.deps-ok"
 SNAP_REV=$(basename "$(readlink -f /snap/m0x41-podman/current)")
+
+# Invoke the wrapper directly with snap env vars set, rather than via
+# `snap run`. On Ubuntu, `snap run` may swallow the wrapper's stderr.
+# This tests the wrapper logic itself, which is the purpose of this suite.
+SNAP="/snap/m0x41-podman/current"
+PODMAN_ENV="SNAP=${SNAP} SNAP_VERSION=5.8.1 SNAP_REVISION=${SNAP_REV}"
+PODMAN_CMD="${SNAP}/bin/podman-wrapper"
 
 pass() { echo "  PASS: $1"; }
 fail() { echo "  FAIL: $1"; FAILURES=$((FAILURES + 1)); }
@@ -23,15 +29,13 @@ run_as_testuser() {
     mkdir -p "/run/user/${uid}"
     chown "${TESTUSER}:${TESTUSER}" "/run/user/${uid}"
     if [ -n "${output_file}" ]; then
-        # Capture ALL output (stdout + stderr merged) so we catch wrapper
-        # messages regardless of how snapd routes file descriptors.
         su - "${TESTUSER}" -c "
-            export XDG_RUNTIME_DIR=/run/user/${uid}
+            export XDG_RUNTIME_DIR=/run/user/${uid} ${PODMAN_ENV}
             ${cmd}
         " >"${output_file}" 2>&1
     else
         su - "${TESTUSER}" -c "
-            export XDG_RUNTIME_DIR=/run/user/${uid}
+            export XDG_RUNTIME_DIR=/run/user/${uid} ${PODMAN_ENV}
             ${cmd}
         "
     fi
@@ -59,16 +63,16 @@ echo ""
 echo "===== PHASE 1: Root Invocation ====="
 
 echo "--- root: no hello message ---"
-ROOT_STDERR=$(${PODMAN} --version 2>&1 1>/dev/null) || true
-if echo "${ROOT_STDERR}" | grep -q "Welcome to m0x41-podman"; then
+ROOT_OUT=$(${PODMAN_ENV} ${PODMAN_CMD} --version 2>&1) || true
+if echo "${ROOT_OUT}" | grep -q "Welcome to m0x41-podman"; then
     fail "root: hello message shown (should be suppressed)"
 else
     pass "root: no hello message"
 fi
 
 echo "--- root: no dependency warning ---"
-ROOT_STDERR2=$(${PODMAN} --version 2>&1 1>/dev/null) || true
-if echo "${ROOT_STDERR2}" | grep -q "WARNING: missing host dependencies"; then
+ROOT_OUT2=$(${PODMAN_ENV} ${PODMAN_CMD} --version 2>&1) || true
+if echo "${ROOT_OUT2}" | grep -q "WARNING: missing host dependencies"; then
     fail "root: dependency warning shown (should be suppressed)"
 else
     pass "root: no dependency warning"
@@ -85,7 +89,7 @@ rm -rf "${MARKER_DIR}"
 
 echo "--- first run: capturing stderr ---"
 STDERR_P2="/tmp/wrapper-phase2-stderr"
-run_as_testuser "${PODMAN} --version" "${STDERR_P2}" || true
+run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P2}" || true
 
 echo "--- first run: hello message shown ---"
 if grep -q "Welcome to m0x41-podman" "${STDERR_P2}" 2>/dev/null; then
@@ -140,7 +144,7 @@ echo ""
 echo "===== PHASE 3: Second Rootless Invocation ====="
 
 STDERR_P3="/tmp/wrapper-phase3-stderr"
-run_as_testuser "${PODMAN} --version" "${STDERR_P3}" || true
+run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P3}" || true
 
 echo "--- second run: no hello message ---"
 if grep -q "Welcome to m0x41-podman" "${STDERR_P3}" 2>/dev/null; then
@@ -173,7 +177,7 @@ echo "===== PHASE 4: Manual Suppression ====="
 run_as_testuser "mkdir -p ${MARKER_DIR} && echo ${SNAP_REV} > ${DEPS_MARKER}" || true
 
 STDERR_P4="/tmp/wrapper-phase4-stderr"
-run_as_testuser "${PODMAN} --version" "${STDERR_P4}" || true
+run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P4}" || true
 
 echo "--- suppressed: no dependency warning ---"
 if grep -q "WARNING: missing host dependencies" "${STDERR_P4}" 2>/dev/null; then
@@ -202,7 +206,7 @@ echo "--- installing missing dependencies ---"
 /root/install_deps.sh
 
 STDERR_P5="/tmp/wrapper-phase5-stderr"
-run_as_testuser "${PODMAN} --version" "${STDERR_P5}" || true
+run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P5}" || true
 
 echo "--- deps installed: newuidmap/newgidmap no longer missing ---"
 if grep -q "newuidmap\|newgidmap" "${STDERR_P5}" 2>/dev/null; then
@@ -261,7 +265,7 @@ rm -f "${HELLO_MARKER}"
 ln -sf m0x41-podman /snap/bin/podman 2>/dev/null || true
 
 STDERR_P6="/tmp/wrapper-phase6-stderr"
-run_as_testuser "${PODMAN} --version" "${STDERR_P6}" || true
+run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P6}" || true
 
 echo "--- aliased: hello shown ---"
 if grep -q "Welcome to m0x41-podman" "${STDERR_P6}" 2>/dev/null; then
