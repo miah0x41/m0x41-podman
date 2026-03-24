@@ -1,0 +1,55 @@
+#!/bin/bash
+# snap/hooks/install — Runs as root on snap install and snap refresh.
+# Creates the podman shim, registers systemd generators, configures
+# libraries, and installs policy.json. Must be idempotent.
+set -euo pipefail
+
+SNAP_CURRENT="/snap/m0x41-podman/current"
+
+# ---------- 1. Create /usr/local/bin/podman shim ----------
+# This shim is the compiled-in path that quadlet generators embed in
+# ExecStart= lines. It sets up the snap's environment and execs podman.
+# No hello message or dependency checks — this is called by systemd.
+mkdir -p /usr/local/bin
+cat > /usr/local/bin/podman <<'SHIM'
+#!/bin/bash
+# m0x41-podman shim — do not edit (managed by snap install hook)
+SNAP=/snap/m0x41-podman/current
+export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export CONTAINERS_CONF="$SNAP/etc/containers/containers.conf"
+export CONTAINERS_REGISTRIES_CONF="$SNAP/etc/containers/registries.conf"
+export CONTAINERS_STORAGE_CONF="$SNAP/etc/containers/storage.conf"
+exec "$SNAP/usr/bin/podman" "$@"
+SHIM
+chmod +x /usr/local/bin/podman
+
+# ---------- 2. Symlink systemd generators ----------
+# Quadlet operates as a systemd generator. systemd discovers generators
+# in /usr/lib/systemd/{system,user}-generators/ — the snap's copies
+# are invisible to systemd without these symlinks.
+mkdir -p /usr/lib/systemd/system-generators /usr/lib/systemd/user-generators
+ln -sf "${SNAP_CURRENT}/usr/lib/systemd/system-generators/podman-system-generator" \
+    /usr/lib/systemd/system-generators/podman-system-generator
+ln -sf "${SNAP_CURRENT}/usr/lib/systemd/user-generators/podman-user-generator" \
+    /usr/lib/systemd/user-generators/podman-user-generator
+
+# ---------- 3. Register snap libraries with ldconfig ----------
+# Child processes (conmon → crun) don't inherit LD_LIBRARY_PATH from
+# the wrapper or shim. Register the snap's library directory system-wide.
+echo "${SNAP_CURRENT}/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf
+ldconfig
+
+# ---------- 4. Install policy.json ----------
+# Classic confinement sees the host filesystem. Podman expects policy.json
+# at /etc/containers/policy.json. Don't overwrite if the user has customised it.
+mkdir -p /etc/containers
+if [ ! -f /etc/containers/policy.json ]; then
+    cp "${SNAP_CURRENT}/etc/containers/policy.json" /etc/containers/policy.json
+fi
+
+# ---------- 5. Reload systemd ----------
+# Make systemd discover the newly-registered generators.
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || true
+fi

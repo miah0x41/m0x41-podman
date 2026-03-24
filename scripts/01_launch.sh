@@ -41,6 +41,12 @@ done
 lxc file push "${PROJECT_DIR}/scripts/podman-wrapper" "${CONTAINER_NAME}/root/snap-build/scripts/podman-wrapper"
 lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/scripts/podman-wrapper
 
+lxc exec "${CONTAINER_NAME}" -- mkdir -p /root/snap-build/snap/hooks
+for f in install remove; do
+    lxc file push "${PROJECT_DIR}/snap/hooks/${f}" "${CONTAINER_NAME}/root/snap-build/snap/hooks/${f}"
+done
+lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/snap/hooks/install /root/snap-build/snap/hooks/remove
+
 lxc file push "${SCRIPT_DIR}/02_build_snap.sh" "${CONTAINER_NAME}/root/02_build_snap.sh"
 lxc exec "${CONTAINER_NAME}" -- chmod +x /root/02_build_snap.sh
 
