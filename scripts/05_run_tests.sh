@@ -1,7 +1,7 @@
 #!/bin/bash
 # 05_run_tests.sh — Runs INSIDE the LXD container
 # Tests snap-installed Podman via `snap run` (classic confinement).
-# Usage: 05_run_tests.sh [tier1|tier2|tier3|tier4|all]
+# Usage: 05_run_tests.sh [tier1|tier2|tier3|tier4|tier5|all]
 #
 # All tests use `m0x41-podman` (i.e. snap run). Classic confinement
 # means the snap command sees the real host filesystem — no bypass needed.
@@ -245,6 +245,229 @@ tier4() {
     fi
 }
 
+# ---------- Tier 5: Quadlet / Install Hook Tests ----------
+tier5() {
+    echo ""
+    echo "===== TIER 5: Quadlet / Install Hook Tests ====="
+
+    # --- 5a: Install hook validation ---
+    echo "--- 5a: Install hook validation ---"
+
+    echo "--- shim exists and is executable ---"
+    if [ -x /usr/local/bin/podman ]; then
+        pass "shim exists at /usr/local/bin/podman"
+    else
+        fail "shim missing or not executable"
+    fi
+
+    echo "--- shim contains marker ---"
+    if grep -q "m0x41-podman shim" /usr/local/bin/podman 2>/dev/null; then
+        pass "shim contains marker comment"
+    else
+        fail "shim marker comment missing"
+    fi
+
+    echo "--- shim reports correct version ---"
+    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.1"; then
+        pass "shim reports 5.8.1"
+    else
+        fail "shim version check"
+    fi
+
+    echo "--- shim finds OCI runtime ---"
+    SHIM_RUNTIME=$(/usr/local/bin/podman info --format '{{.Host.OCIRuntime.Name}}' 2>&1) || true
+    if echo "${SHIM_RUNTIME}" | grep -q "crun"; then
+        pass "shim: OCI runtime is crun"
+    else
+        fail "shim: OCI runtime is '${SHIM_RUNTIME}', expected 'crun'"
+    fi
+
+    echo "--- system generator symlink ---"
+    if [ -L /usr/lib/systemd/system-generators/podman-system-generator ]; then
+        pass "system generator symlink exists"
+    else
+        fail "system generator symlink missing"
+    fi
+
+    echo "--- user generator symlink ---"
+    if [ -L /usr/lib/systemd/user-generators/podman-user-generator ]; then
+        pass "user generator symlink exists"
+    else
+        fail "user generator symlink missing"
+    fi
+
+    echo "--- policy.json installed ---"
+    if [ -f /etc/containers/policy.json ]; then
+        pass "policy.json exists"
+    else
+        fail "policy.json missing"
+    fi
+
+    echo "--- ldconfig conf installed ---"
+    if [ -f /etc/ld.so.conf.d/podman-snap.conf ]; then
+        pass "ldconfig conf exists"
+    else
+        fail "ldconfig conf missing"
+    fi
+
+    echo "--- libyajl in ldconfig cache ---"
+    if ldconfig -p 2>/dev/null | grep -q libyajl; then
+        pass "libyajl registered in ldconfig"
+    else
+        fail "libyajl not in ldconfig cache"
+    fi
+
+    # --- 5b: Quadlet dry-run ---
+    echo ""
+    echo "--- 5b: Quadlet dry-run ---"
+
+    QUADLET="${SNAP}/usr/libexec/podman/quadlet"
+    QUADLET_TMPDIR=$(mktemp -d)
+    cat > "${QUADLET_TMPDIR}/dryrun-test.container" <<'CEOF'
+[Container]
+Image=docker.io/library/alpine
+Exec=echo dryrun-ok
+CEOF
+
+    echo "--- quadlet generates valid unit ---"
+    DRYRUN_OUT=$(QUADLET_UNIT_DIRS="${QUADLET_TMPDIR}" "${QUADLET}" -dryrun 2>&1) || true
+    if echo "${DRYRUN_OUT}" | grep -q "\[Service\]"; then
+        pass "quadlet dry-run produces [Service] section"
+    else
+        fail "quadlet dry-run missing [Service] section"
+    fi
+
+    echo "--- generated ExecStart references shim path ---"
+    if echo "${DRYRUN_OUT}" | grep -q "ExecStart=/usr/local/bin/podman"; then
+        pass "ExecStart references /usr/local/bin/podman"
+    else
+        fail "ExecStart does not reference /usr/local/bin/podman"
+    fi
+
+    echo "--- quadlet version matches ---"
+    if "${QUADLET}" --version 2>&1 | grep -q "5.8.1"; then
+        pass "quadlet version is 5.8.1"
+    else
+        fail "quadlet version mismatch"
+    fi
+    rm -rf "${QUADLET_TMPDIR}"
+
+    # --- 5c: Live Quadlet rootful ---
+    echo ""
+    echo "--- 5c: Live Quadlet rootful ---"
+
+    mkdir -p /etc/containers/systemd
+    cat > /etc/containers/systemd/snap-test-quadlet.container <<'CEOF'
+[Container]
+Image=docker.io/library/alpine
+Exec=echo quadlet-rootful-ok
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+CEOF
+
+    echo "--- rootful quadlet service starts ---"
+    systemctl daemon-reload 2>&1
+    if systemctl start snap-test-quadlet.service 2>&1; then
+        pass "rootful quadlet service started"
+    else
+        fail "rootful quadlet service failed to start"
+    fi
+
+    echo "--- rootful quadlet output correct ---"
+    if journalctl -u snap-test-quadlet.service --no-pager -n 10 2>/dev/null | grep -q "quadlet-rootful-ok"; then
+        pass "rootful quadlet output: quadlet-rootful-ok"
+    else
+        fail "rootful quadlet output missing"
+    fi
+
+    # Clean up rootful quadlet
+    systemctl stop snap-test-quadlet.service 2>/dev/null || true
+    rm -f /etc/containers/systemd/snap-test-quadlet.container
+    ${PODMAN} system prune -af 2>&1 || true
+    systemctl daemon-reload 2>&1
+
+    # --- 5d: Live Quadlet rootless ---
+    echo ""
+    echo "--- 5d: Live Quadlet rootless ---"
+
+    TESTUSER_HOME=$(eval echo "~${TESTUSER}")
+    TESTUSER_QUADLET_DIR="${TESTUSER_HOME}/.config/containers/systemd"
+    mkdir -p "${TESTUSER_QUADLET_DIR}"
+    cat > "${TESTUSER_QUADLET_DIR}/snap-test-rootless.container" <<'CEOF'
+[Container]
+Image=docker.io/library/alpine
+Exec=echo quadlet-rootless-ok
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+CEOF
+    chown -R "${TESTUSER}:${TESTUSER}" "${TESTUSER_HOME}/.config"
+
+    echo "--- rootless quadlet service starts ---"
+    if run_as_testuser "systemctl --user daemon-reload && systemctl --user start snap-test-rootless.service" 2>&1; then
+        pass "rootless quadlet service started"
+    else
+        fail "rootless quadlet service failed to start"
+    fi
+
+    echo "--- rootless quadlet output correct ---"
+    if run_as_testuser "journalctl --user -u snap-test-rootless.service --no-pager -n 10" 2>/dev/null | grep -q "quadlet-rootless-ok"; then
+        pass "rootless quadlet output: quadlet-rootless-ok"
+    else
+        fail "rootless quadlet output missing"
+    fi
+
+    # Clean up rootless quadlet
+    run_as_testuser "systemctl --user stop snap-test-rootless.service" 2>/dev/null || true
+    rm -f "${TESTUSER_QUADLET_DIR}/snap-test-rootless.container"
+    run_as_testuser "systemctl --user daemon-reload" 2>/dev/null || true
+    run_as_testuser "${PODMAN} system prune -af" 2>&1 || true
+
+    # --- 5e: BATS quadlet tests (gated) ---
+    echo ""
+    echo "--- 5e: BATS quadlet tests ---"
+
+    if [ -d "${PODMAN_SRC}/test/system" ] && command -v bats &>/dev/null; then
+        SNAP_BINARY=$(command -v ${PODMAN}) || true
+        export QUADLET="${SNAP}/usr/libexec/podman/quadlet"
+
+        for batsfile in 252-quadlet.bats 253-podman-quadlet.bats 254-podman-quadlet-multi.bats; do
+            if [ -f "${PODMAN_SRC}/test/system/${batsfile}" ]; then
+                echo "--- ${batsfile} ---"
+                cd "${PODMAN_SRC}"
+                if PODMAN=/usr/local/bin/podman bats "test/system/${batsfile}" 2>&1 | tee "${RESULTS_DIR}/quadlet-${batsfile}.log" | tail -5; then
+                    pass "BATS ${batsfile}"
+                else
+                    fail "BATS ${batsfile} (check ${RESULTS_DIR}/quadlet-${batsfile}.log)"
+                fi
+            fi
+        done
+    else
+        echo "  Skipped: BATS or Podman source not available"
+    fi
+
+    # --- 5f: Go e2e quadlet tests (gated) ---
+    echo ""
+    echo "--- 5f: Go e2e quadlet tests ---"
+
+    if [ -f "${PODMAN_SRC}/test/e2e/quadlet_test.go" ] && command -v go &>/dev/null; then
+        echo "--- go test quadlet_test.go ---"
+        cd "${PODMAN_SRC}"
+        if QUADLET_BINARY="${SNAP}/usr/libexec/podman/quadlet" \
+           PODMAN=/usr/local/bin/podman \
+           go test -v -count=1 -run "Quadlet" ./test/e2e/ 2>&1 | tee "${RESULTS_DIR}/quadlet-go-e2e.log" | tail -20; then
+            pass "Go e2e quadlet tests"
+        else
+            fail "Go e2e quadlet tests (check ${RESULTS_DIR}/quadlet-go-e2e.log)"
+        fi
+    else
+        echo "  Skipped: Go or Podman source not available"
+    fi
+}
+
 # ---------- Main ----------
 echo "=========================================="
 echo "  Podman Classic Snap Test Runner"
@@ -257,14 +480,16 @@ case "${TIER}" in
     tier2) tier2 ;;
     tier3) tier3 ;;
     tier4) tier4 ;;
+    tier5) tier5 ;;
     all)
         tier1
         tier2
         tier3
         tier4
+        tier5
         ;;
     *)
-        echo "Usage: $0 [tier1|tier2|tier3|tier4|all]"
+        echo "Usage: $0 [tier1|tier2|tier3|tier4|tier5|all]"
         exit 1
         ;;
 esac

@@ -218,14 +218,8 @@ fi
 # Note: dbus-user-session may still appear "missing" in LXD containers because
 # su - does not create a logind session, so dbus-send --session always fails.
 # This is a container environment limitation, not a wrapper bug.
-# We only check that the binary deps (uidmap, libgpg-error) were resolved.
-
-echo "--- deps installed: libgpg-error no longer missing ---"
-if grep -q "libgpg-error" "${STDERR_P5}" 2>/dev/null; then
-    fail "deps installed: libgpg-error still reported missing"
-else
-    pass "deps installed: libgpg-error no longer missing"
-fi
+# We only check that the binary deps (uidmap) were resolved.
+# libgpg-error is no longer checked by the wrapper — handled by install hook ldconfig.
 
 echo "--- deps installed: marker behaviour ---"
 # If all deps are satisfied (no WARNING at all), the marker should be created.

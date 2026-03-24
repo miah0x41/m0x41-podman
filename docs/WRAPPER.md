@@ -19,9 +19,11 @@ On the first _rootless_ invocation, the wrapper prints a welcome message to `std
     sudo snap alias m0x41-podman podman
 ```
 
-- The alias tip is suppressed if `/snap/bin/podman` already symlinks to `m0x41-podman` (i.e. the alias is set).
+- The alias tip is suppressed if `/snap/bin/podman` already symlinks to `m0x41-podman` (i.e. the snap alias is set) or if `/usr/local/bin/podman` exists with the snap's marker comment (i.e. the install hook's shim is in place). Since the install hook always creates the shim, the alias tip is effectively never shown after a normal installation.
 - The message is shown once. A marker file at `~/.local/share/m0x41-podman/.hello` prevents it from appearing again.
 - Root invocations never see this message.
+
+**Note:** The wrapper is the entry point for `snap run m0x41-podman` (interactive use). The `/usr/local/bin/podman` shim created by the install hook is a separate, minimal entry point used by systemd and scripts. See [QUADLET.md](QUADLET.md) for details on the shim.
 
 ### 3. Dependency Detection
 
@@ -43,14 +45,15 @@ The checks are:
 | `command -v newuidmap` | `uidmap` package missing | Requires setuid bit — stripped during snap packing |
 | `command -v newgidmap` | `uidmap` package missing | Same as above |
 | `dbus-send --session` | `dbus-user-session` missing or no session bus | Requires a running system service |
-| `/usr/sbin/ldconfig -p \| grep libgpg-error` | `libgpg-error` library missing | Loaded by processes outside the snap's `LD_LIBRARY_PATH` |
+
+Note: `libgpg-error` was previously checked here but is now handled by the install hook's `ldconfig` registration and no longer appears in the wrapper's dependency checks.
 
 The install command adapts to the distro:
 
 | Distro | Package Manager | Packages |
 |--------|-----------------|----------|
-| Ubuntu / Debian | `apt` | `uidmap`, `dbus-user-session`, `libgpg-error0` |
-| Fedora / CentOS / RHEL | `dnf` | `shadow-utils`, `dbus-daemon`, `libgpg-error` |
+| Ubuntu / Debian | `apt` | `uidmap`, `dbus-user-session` |
+| Fedora / CentOS / RHEL | `dnf` | `shadow-utils`, `dbus-daemon` |
 
 ## Marker Files
 

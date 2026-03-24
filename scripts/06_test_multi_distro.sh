@@ -11,9 +11,11 @@ SNAP_FILE="${PROJECT_DIR}/m0x41-podman_5.8.1_amd64.snap"
 RESULTS_FILE="${PROJECT_DIR}/multi-distro-results.txt"
 
 # Test counts per tier (must match 05_run_tests.sh)
+# Tier 5 count covers 5a-5d only (5e/5f gated on Go/BATS, not available in multi-distro)
 TIER1_COUNT=7
 TIER2_COUNT=8
 TIER3_COUNT=6
+TIER5_COUNT=16
 
 # Parse args
 CLEANUP=false
@@ -21,8 +23,8 @@ TIER="all"
 for arg in "$@"; do
     case "${arg}" in
         --cleanup) CLEANUP=true ;;
-        tier[1-3]|all) TIER="${arg}" ;;
-        *) echo "Usage: $0 [--cleanup] [tier1|tier2|tier3|all]"; exit 1 ;;
+        tier[1-5]|all) TIER="${arg}" ;;
+        *) echo "Usage: $0 [--cleanup] [tier1|tier2|tier3|tier5|all]"; exit 1 ;;
     esac
 done
 
@@ -38,7 +40,7 @@ DISTRO_IMAGES=(  "ubuntu:22.04"  "ubuntu:24.04"  "images:debian/12"  "images:fed
 
 build_tiers_list() {
     case "${TIER}" in
-        all) echo "tier1 tier2 tier3" ;;
+        all) echo "tier1 tier2 tier3 tier5" ;;
         *)   echo "${TIER}" ;;
     esac
 }
@@ -48,6 +50,7 @@ count_for_tier() {
         tier1) echo "${TIER1_COUNT}" ;;
         tier2) echo "${TIER2_COUNT}" ;;
         tier3) echo "${TIER3_COUNT}" ;;
+        tier5) echo "${TIER5_COUNT}" ;;
     esac
 }
 
@@ -93,7 +96,7 @@ test_distro() {
                 -c security.nesting=true \
                 -c security.syscalls.intercept.mknod=true \
                 -c security.syscalls.intercept.setxattr=true 2>&1; then
-                echo "RESULT:${name}:LAUNCH FAIL:-:-:-"
+                echo "RESULT:${name}:LAUNCH FAIL:-:-:-:-"
                 return
             fi
         fi
@@ -108,7 +111,7 @@ test_distro() {
         done
         if ! ${NET_OK}; then
             echo "Networking failed after 60s"
-            RESULT_LINE="RESULT:${name}:NET FAIL:-:-:-"
+            RESULT_LINE="RESULT:${name}:NET FAIL:-:-:-:-"
             echo "${RESULT_LINE}"
             if ${CLEANUP}; then lxc delete --force "${container}" 2>/dev/null || true; fi
             return
@@ -124,23 +127,24 @@ test_distro() {
         # --- Run setup ---
         echo "Running setup..."
         if ! lxc exec "${container}" -- /root/07_test_setup_multi.sh 2>&1; then
-            echo "RESULT:${name}:SETUP FAIL:-:-:-"
+            echo "RESULT:${name}:SETUP FAIL:-:-:-:-"
             if ${CLEANUP}; then lxc delete --force "${container}" 2>/dev/null || true; fi
             return
         fi
 
         # --- Run requested tiers ---
-        local t1="-" t2="-" t3="-"
+        local t1="-" t2="-" t3="-" t5="-"
         for t in $(build_tiers_list); do
             result=$(run_tier "${container}" "${t}")
             case "${t}" in
                 tier1) t1="${result}" ;;
                 tier2) t2="${result}" ;;
                 tier3) t3="${result}" ;;
+                tier5) t5="${result}" ;;
             esac
         done
 
-        echo "RESULT:${name}:OK:${t1}:${t2}:${t3}"
+        echo "RESULT:${name}:OK:${t1}:${t2}:${t3}:${t5}"
 
         if ${CLEANUP}; then
             echo "Cleaning up ${container}..."
@@ -186,22 +190,22 @@ echo ""
 echo "=========================================="
 echo "  Summary"
 echo "=========================================="
-printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-    "Distro" "Setup" "Tier 1 (${TIER1_COUNT})" "Tier 2 (${TIER2_COUNT})" "Tier 3 (${TIER3_COUNT})"
-printf "|%-18s|%-13s|%-16s|%-16s|%-16s|\n" \
-    "------------------" "-------------" "----------------" "----------------" "----------------"
+printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+    "Distro" "Setup" "Tier 1 (${TIER1_COUNT})" "Tier 2 (${TIER2_COUNT})" "Tier 3 (${TIER3_COUNT})" "Tier 5 (${TIER5_COUNT})"
+printf "|%-18s|%-13s|%-16s|%-16s|%-16s|%-16s|\n" \
+    "------------------" "-------------" "----------------" "----------------" "----------------" "----------------"
 
 for i in "${!DISTRO_NAMES[@]}"; do
     name="${DISTRO_NAMES[$i]}"
     log="/tmp/multi-distro-22-${name}.log"
     line=$(grep "^RESULT:" "${log}" 2>/dev/null | tail -1)
     if [ -n "${line}" ]; then
-        IFS=':' read -r _ dname setup t1 t2 t3 <<< "${line}"
-        printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-            "${dname}" "${setup}" "${t1}" "${t2}" "${t3}"
+        IFS=':' read -r _ dname setup t1 t2 t3 t5 <<< "${line}"
+        printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+            "${dname}" "${setup}" "${t1}" "${t2}" "${t3}" "${t5}"
     else
-        printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-            "${name}" "UNKNOWN" "-" "-" "-"
+        printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+            "${name}" "UNKNOWN" "-" "-" "-" "-"
     fi
 done
 
@@ -211,21 +215,21 @@ done
     echo "Date: $(date -Iseconds)"
     echo "Tier: ${TIER}"
     echo ""
-    printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-        "Distro" "Setup" "Tier 1 (${TIER1_COUNT})" "Tier 2 (${TIER2_COUNT})" "Tier 3 (${TIER3_COUNT})"
-    printf "|%-18s|%-13s|%-16s|%-16s|%-16s|\n" \
-        "------------------" "-------------" "----------------" "----------------" "----------------"
+    printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+        "Distro" "Setup" "Tier 1 (${TIER1_COUNT})" "Tier 2 (${TIER2_COUNT})" "Tier 3 (${TIER3_COUNT})" "Tier 5 (${TIER5_COUNT})"
+    printf "|%-18s|%-13s|%-16s|%-16s|%-16s|%-16s|\n" \
+        "------------------" "-------------" "----------------" "----------------" "----------------" "----------------"
     for i in "${!DISTRO_NAMES[@]}"; do
         name="${DISTRO_NAMES[$i]}"
         log="/tmp/multi-distro-22-${name}.log"
         line=$(grep "^RESULT:" "${log}" 2>/dev/null | tail -1)
         if [ -n "${line}" ]; then
-            IFS=':' read -r _ dname setup t1 t2 t3 <<< "${line}"
-            printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-                "${dname}" "${setup}" "${t1}" "${t2}" "${t3}"
+            IFS=':' read -r _ dname setup t1 t2 t3 t5 <<< "${line}"
+            printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+                "${dname}" "${setup}" "${t1}" "${t2}" "${t3}" "${t5}"
         else
-            printf "| %-16s | %-11s | %-14s | %-14s | %-14s |\n" \
-                "${name}" "UNKNOWN" "-" "-" "-"
+            printf "| %-16s | %-11s | %-14s | %-14s | %-14s | %-14s |\n" \
+                "${name}" "UNKNOWN" "-" "-" "-" "-"
         fi
     done
 } > "${RESULTS_FILE}"

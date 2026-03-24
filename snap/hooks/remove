@@ -1,0 +1,33 @@
+#!/bin/bash
+# snap/hooks/remove — Runs as root on snap remove.
+# Cleans up artefacts created by the install hook.
+# Must not fail if artefacts are already gone.
+
+# ---------- 1. Warn about active quadlet units ----------
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl list-units --type=service --state=active 2>/dev/null | grep -q "podman-\|systemd-.*\.service.*generated"; then
+        echo "WARNING: Active Podman Quadlet services detected. These will fail after removal." >&2
+    fi
+fi
+
+# ---------- 2. Remove podman shim ----------
+# Only remove if it's ours (contains the marker comment).
+if [ -f /usr/local/bin/podman ] && grep -q "m0x41-podman shim" /usr/local/bin/podman 2>/dev/null; then
+    rm -f /usr/local/bin/podman
+fi
+
+# ---------- 3. Remove generator symlinks ----------
+rm -f /usr/lib/systemd/system-generators/podman-system-generator
+rm -f /usr/lib/systemd/user-generators/podman-user-generator
+
+# ---------- 4. Remove ldconfig config ----------
+rm -f /etc/ld.so.conf.d/podman-snap.conf
+ldconfig 2>/dev/null || true
+
+# ---------- 5. Reload systemd ----------
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || true
+fi
+
+# Note: /etc/containers/policy.json is NOT removed — it may have been
+# customised by the user or be needed by other container tools.

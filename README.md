@@ -1,6 +1,6 @@
 # Podman Snap (Classic Confinement)
 
-_Podman_ v5.8.1 packaged as a classic confinement snap, built on `core22` (Ubuntu 22.04). Tested across five Linux distributions in both _rootless_ and _rootful_ modes.
+_Podman_ v5.8.1 with full _Quadlet_ (systemd integration) support, packaged as a classic confinement snap on `core22` (Ubuntu 22.04). Bundles all runtime dependencies — no additional packages needed on the host beyond `uidmap` for rootless mode. Tested end-to-end across five Linux distributions in both _rootless_ and _rootful_ modes.
 
 This project exists because there is no official _Podman_ snap, and previous community attempts have stalled:
 
@@ -16,9 +16,48 @@ This project exists because there is no official _Podman_ snap, and previous com
 
 - [mgoltzsche/podman-static](https://github.com/mgoltzsche/podman-static?tab=readme-ov-file) — _Podman_ static builds.
 
+## Quick Start
+
+```bash
+sudo snap install m0x41-podman_5.8.1_amd64.snap --dangerous --classic
+```
+
+The snap's install hook places `podman` on PATH at `/usr/local/bin/podman` and registers systemd generators for Quadlet. Both happen automatically — no manual configuration needed.
+
+> **Note:** If you already have `podman` installed via `apt` or another package manager, the snap's `/usr/local/bin/podman` will take precedence on PATH (since `/usr/local/bin` is searched before `/usr/bin`). Remove the existing installation first, or use the snap command name `m0x41-podman` to avoid conflicts.
+
+```bash
+podman run --rm docker.io/library/alpine echo "hello from snap"
+```
+
+For rootless mode on server or minimal installs, you may need: `sudo apt install uidmap dbus-user-session`
+
+## Quadlet (Systemd Integration)
+
+_Podman_ 5.x includes _Quadlet_ — a native mechanism for running containers as systemd services. This snap supports Quadlet out of the box, with systemd generators registered automatically by the install hook. Both rootful and rootless Quadlet are supported.
+
+```bash
+sudo mkdir -p /etc/containers/systemd
+sudo tee /etc/containers/systemd/my-app.container <<EOF
+[Container]
+Image=docker.io/library/nginx
+PublishPort=8080:80
+
+[Install]
+WantedBy=default.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl start my-app.service
+```
+
+Quadlet has been validated end-to-end: the snap's install hook creates a `/usr/local/bin/podman` shim and registers the `podman-system-generator` and `podman-user-generator` with systemd. Live Quadlet services have been tested in both rootful and rootless modes across all supported distributions — containers start, run, and stop correctly as systemd units.
+
+See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the shim vs wrapper distinction, and detailed test results.
+
 ## Distro Compatibility
 
-Tested 2026-03-19. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`. Rootless mode requires `uidmap` and `dbus-user-session` on the host (provides `newuidmap`/`newgidmap` and the D-Bus user session bus). These are installed by default on Ubuntu Desktop but not on server or minimal installs — run `sudo apt install uidmap dbus-user-session` if missing. Fedora and CentOS also need `libgpg-error` (the snap bundles `libgpgme` but not this dependency).
+Tested 2026-03-24. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`.
 
 ### Rootless
 
@@ -48,15 +87,27 @@ Ubuntu 20.04 fails because `glibc` 2.31 is below the snap's minimum of 2.34.
 
 Debian 12, CentOS 9, and Fedora 42 require `iptables` on the host. `netavark` (the container network backend) calls `iptables` as a child process of `conmon`, which does not inherit the snap's `PATH`. These distros ship `nftables` natively and do not include an `iptables` command by default.
 
-## Quick Start
+## What's in the Snap
 
-### Install from a Local Build
+The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host, except `iptables` on non-Ubuntu distros and `uidmap` + `dbus-user-session` for rootless mode (see [Distro Compatibility](#distro-compatibility)):
 
-```bash
-sudo snap install m0x41-podman_5.8.1_amd64.snap --dangerous --classic
-```
+| Component | Version | Source |
+|-----------|---------|--------|
+| `Podman` (with `quadlet`) | v5.8.1 | Built from source |
+| `crun` | 1.19.1 | Built from source |
+| `netavark` | 1.14.1 | Pre-built binary |
+| `aardvark-dns` | 1.14.0 | Pre-built binary |
+| `conmon`, `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables` | Ubuntu 22.04 | Packaged binaries |
 
-### Build the Snap Yourself
+The snap's install hook automatically:
+- Creates `/usr/local/bin/podman` (so `podman` is on PATH without aliasing)
+- Registers systemd generators (so Quadlet works immediately)
+- Configures bundled library paths via `ldconfig`
+- Installs `policy.json` at `/etc/containers/policy.json`
+
+See [docs/COMPONENTS.md](docs/COMPONENTS.md) for full details including licenses and upstream links.
+
+## Build
 
 Requires LXD. The build runs inside an LXD container — no root access needed on the host.
 
@@ -64,96 +115,47 @@ Requires LXD. The build runs inside an LXD container — no root access needed o
 /usr/bin/sg lxd -c "./scripts/01_launch.sh"
 ```
 
-This creates an LXD container, builds the snap with `snapcraft --destructive-mode`, and pulls the `.snap` file back to the host.
+This creates an LXD container, builds the snap with `snapcraft --destructive-mode`, and pulls the `.snap` file back to the host. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build details, script reference, and compatibility issues.
 
-### Alias as `podman`
+## Testing
 
-To use `podman` instead of `m0x41-podman`:
+The snap is validated with a five-tier test suite covering command validation, rootless and rootful functional tests, upstream BATS parity, and Quadlet/install hook validation. All tiers run automatically in LXD containers across five distributions.
 
-```bash
-sudo snap alias m0x41-podman podman
-```
+| Tier | Tests | What It Validates |
+|------|-------|-------------------|
+| 1 | 7 | Snap binary, component versions, config paths |
+| 2 | 8 | Rootless: pull, run, build, pod, volume, DNS |
+| 3 | 6 | Rootful: run, build, pod, volume |
+| 4 | 31 | Upstream BATS smoke tests |
+| 5 | 16+ | Install hook artefacts, Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS quadlet tests, Go e2e quadlet tests |
 
-To remove the alias later: `sudo snap unalias podman`
-
-### Run
-
-```bash
-m0x41-podman run --rm docker.io/library/alpine echo "hello from snap"
-
-# Or, if aliased:
-podman run --rm docker.io/library/alpine echo "hello from snap"
-```
-
-### First-Run Messages
-
-On the first rootless invocation, the snap prints a welcome message with alias instructions (if not already aliased). If host dependencies are missing, it prints a warning with the exact install command for your distro. See [docs/WRAPPER.md](docs/WRAPPER.md) for full details on what is checked and how to suppress warnings.
-
-## How This Was Tested
-
-The snap was developed through a structured process, with each stage informing the next:
-
-### 1. Native Build from Source (Ubuntu 24.04)
-
-Built _Podman_ v5.8.1 from source to establish a known-good baseline. Identified every compatibility fix needed versus stock Ubuntu 24.04: `crun` too old (1.14.1 → 1.19.1), `Go` not in repos (1.24.2), `OpenSSL` 3.0.x missing `-quiet` flag, `AppArmor` user namespace restrictions. Validated with a 5-tier test suite covering unit tests, rootless and rootful functional tests, upstream BATS tests, and API tests. All tiers pass in both LXD containers and VMs.
-
-### 2. Strict Confinement Snap (Failed)
-
-Attempted strict confinement first — the preferred approach for snap security. The snap built correctly but **cannot run containers**: snap's mount namespace hides the host's setuid `newuidmap`/`newgidmap` binaries, which are required for rootless user namespace creation. There is no workaround — staging the binaries strips setuid, `squashfs` uses `nosuid`, and file capabilities are also stripped. Six distinct constraints were documented. See [Why Classic Confinement?](#why-classic-confinement) below.
-
-### 3. Classic Confinement Snap (core24)
-
-Switched to classic confinement, which bypasses the mount namespace entirely. All 21 functional tests pass (7 command validation + 8 rootless + 6 rootful). 28 of 31 upstream `BATS` tests pass — the 3 failures are snap-specific configuration conflicts, not functional regressions. Results are identical in LXD containers and VMs.
-
-However, `core24` builds against `glibc` 2.38, limiting the snap to Ubuntu 24.04 only. Older distros fail immediately.
-
-### 4. Classic Confinement Snap (core22) — Widening Distro Support
-
-Rebuilt on `core22` to lower the `glibc` floor. This required switching from Ubuntu apt packages to pre-built binaries for `netavark` and `aardvark-dns` (not in Ubuntu 22.04 repos), dropping `passt` in favour of `slirp4netns` for rootless networking, and using `snapcraft` 7.x instead of 8.x. The actual `glibc` floor turned out to be 2.34 — lower than the predicted 2.35 — discovered when CentOS 9 Stream passed all tests.
-
-### 5. Multi-Distro Testing
-
-Automated parallel testing across five distributions using LXD containers. Each distro gets a fresh container, the snap is installed, and tiers 1-3 are run. Four of five distros pass all 21 tests. The Fedora rootless failure was traced to a missing setuid bit on `newuidmap` inside LXD — an environment limitation, not a snap defect.
-
-### 6. VM Testing
-
-LXD VMs provide full kernel isolation (no shared kernel, no nesting flags), which is closer to bare-metal. The `core24` snap was validated in VMs with identical results to containers — 21/21 functional, 28/31 `BATS`.
-
-## What's in the Snap
-
-The snap bundles _Podman_ and all its runtime dependencies so that no additional packages are needed on the host, except `iptables` on non-Ubuntu distros, `uidmap` and `dbus-user-session` for rootless mode, and `libgpg-error` on Fedora/CentOS (see [Distro Compatibility](#distro-compatibility)):
-
-| Component | Version | Source |
-|-----------|---------|--------|
-| `Podman` | v5.8.1 | Built from source |
-| `crun` | 1.19.1 | Built from source |
-| `netavark` | 1.14.1 | Pre-built binary |
-| `aardvark-dns` | 1.14.0 | Pre-built binary |
-| `conmon`, `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables` | Ubuntu 22.04 | Packaged binaries |
-
-See [docs/COMPONENTS.md](docs/COMPONENTS.md) for full details including licenses and upstream links.
+See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro results, and known failures.
 
 ## Why Classic Confinement?
 
-Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement is the only path to a functional _Podman_ snap. Note that `uidmap` and `dbus-user-session` must be installed on the host for rootless mode — they are not bundled in the snap, but accessed directly through classic confinement.
+Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement also enables the install hook to register systemd generators for Quadlet and place the `podman` shim on PATH — operations that strict confinement does not permit.
 
 ## Repository Structure and Documentation
 
 ```
 snapcraft.yaml                  # Snap definition (core22, classic confinement)
 snap/                           # Bundled container engine configuration
+  hooks/install                 # Install hook (shim, generators, ldconfig, policy.json)
+  hooks/remove                  # Remove hook (cleanup)
 scripts/                        # Build, test, and multi-distro automation
 docs/
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology and results
   COMPONENTS.md                 # Upstream components, versions, and licenses
   WRAPPER.md                    # Wrapper script behaviour, messages, and testing
+  QUADLET.md                    # Quadlet (systemd integration) and install hooks
 ```
 
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment setup, prerequisites, script reference
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment, prerequisites, script reference, architecture diagram
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests, multi-distro methodology, results
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
-- **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper script behaviour, first-run messages, dependency detection, and test results
+- **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper behaviour, first-run messages, dependency detection
+- **[docs/QUADLET.md](docs/QUADLET.md)** — Quadlet support, install/remove hooks, shim vs wrapper
 
 ## Acknowledgements
 

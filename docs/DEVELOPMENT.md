@@ -80,14 +80,16 @@ All scripts are in the `scripts/` directory.
 | `02_build_snap.sh` | Build container | Installs `snapcraft` 7.x/stable and runs `snapcraft --destructive-mode` |
 | `03_test_launch.sh` | Host | Creates an Ubuntu 24.04 test container, pushes the snap + test scripts, runs setup and tests |
 | `03_test_launch_vm.sh` | Host | Same as above but launches an LXD VM instead of a container |
-| `04_test_setup.sh` | Test container | Installs the snap, creates a test user with subuid/subgid ranges, registers bundled libraries via `ldconfig`, installs `Go`/`BATS`/_Podman_ source for tier 4 |
-| `05_run_tests.sh` | Test container | Four-tier test runner. Accepts `tier1`, `tier2`, `tier3`, `tier4`, or `all` |
-| `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 on all, prints a summary table |
+| `04_test_setup.sh` | Test container | Installs the snap, verifies install hook artefacts, creates a test user, installs `Go`/`BATS`/_Podman_ source for tiers 4-5 |
+| `05_run_tests.sh` | Test container | Five-tier test runner. Accepts `tier1`..`tier5` or `all` |
+| `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 + 5 on all, prints a summary table |
 | `07_test_setup_multi.sh` | Test container | Distro-agnostic setup — detects the distro, installs `snapd` and prerequisites, installs the snap, creates the test user. Handles Ubuntu, Debian, Fedora, and CentOS/RHEL |
 | `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
 | `10_wrapper_tests.sh` | Test container | 19-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
+| `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
+| `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, and `ldconfig` config; warns about active Quadlet services |
 
 ## Key Compatibility Issues
 
