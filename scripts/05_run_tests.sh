@@ -104,14 +104,14 @@ tier2() {
     fi
 
     echo "--- image build (rootless) ---"
-    TMPDIR=$(mktemp -d)
-    cat > "${TMPDIR}/Containerfile" <<'CEOF'
+    BUILD_DIR=$(mktemp -d)
+    cat > "${BUILD_DIR}/Containerfile" <<'CEOF'
 FROM docker.io/library/alpine:latest
 RUN echo "built by classic snap podman" > /built.txt
 CMD cat /built.txt
 CEOF
-    chown -R "${TESTUSER}:${TESTUSER}" "${TMPDIR}"
-    if run_as_testuser "${PODMAN} build -t snap-test ${TMPDIR}" 2>&1; then
+    chown -R "${TESTUSER}:${TESTUSER}" "${BUILD_DIR}"
+    if run_as_testuser "${PODMAN} build -t snap-test ${BUILD_DIR}" 2>&1; then
         pass "rootless image build"
     else
         fail "rootless image build"
@@ -121,7 +121,7 @@ CEOF
     else
         fail "rootless run built image"
     fi
-    rm -rf "${TMPDIR}"
+    rm -rf "${BUILD_DIR}"
 
     echo "--- pod lifecycle (rootless) ---"
     if run_as_testuser "${PODMAN} pod create --name testpod && ${PODMAN} pod start testpod && ${PODMAN} pod stop testpod && ${PODMAN} pod rm testpod" 2>&1; then
@@ -169,13 +169,13 @@ tier3() {
     fi
 
     echo "--- image build (rootful) ---"
-    TMPDIR=$(mktemp -d)
-    cat > "${TMPDIR}/Containerfile" <<'CEOF'
+    BUILD_DIR=$(mktemp -d)
+    cat > "${BUILD_DIR}/Containerfile" <<'CEOF'
 FROM docker.io/library/alpine:latest
 RUN echo "built by rootful classic snap podman" > /built.txt
 CMD cat /built.txt
 CEOF
-    if ${PODMAN} build -t snap-root-test "${TMPDIR}" 2>&1; then
+    if ${PODMAN} build -t snap-root-test "${BUILD_DIR}" 2>&1; then
         pass "rootful image build"
     else
         fail "rootful image build"
@@ -185,7 +185,7 @@ CEOF
     else
         fail "rootful run built image"
     fi
-    rm -rf "${TMPDIR}"
+    rm -rf "${BUILD_DIR}"
 
     echo "--- pod lifecycle (rootful) ---"
     if ${PODMAN} pod create --name rootpod && ${PODMAN} pod start rootpod && ${PODMAN} pod stop rootpod && ${PODMAN} pod rm rootpod; then

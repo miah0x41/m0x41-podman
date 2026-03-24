@@ -107,7 +107,7 @@ The wrapper's behaviour is validated by a dedicated multi-distro test suite that
 |--------|---------|---------|
 | `08_wrapper_test_launch.sh` | Host | Parallel orchestrator — launches five distro containers and collects results |
 | `09_wrapper_test_setup.sh` | Container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
-| `10_wrapper_tests.sh` | Container | 19-test suite across 6 phases |
+| `10_wrapper_tests.sh` | Container | 18-test suite across 6 phases |
 
 ### Test Phases
 
@@ -117,26 +117,26 @@ The wrapper's behaviour is validated by a dedicated multi-distro test suite that
 | 2. First rootless run | 6 | Hello message shown, alias tip shown, hello marker created, dependency warning with distro-specific install command and suppress instructions |
 | 3. Second rootless run | 3 | Hello message not repeated, dependency warning persists, suppress instructions shown |
 | 4. Manual suppression | 2 | Marker file silences dependency warning |
-| 5. After installing deps | 3 | `newuidmap`/`newgidmap` and `libgpg-error` no longer reported missing, marker behaviour correct |
+| 5. After installing deps | 2 | `newuidmap`/`newgidmap` no longer reported missing, marker behaviour correct |
 | 6. Alias tip suppression | 3 | Hello re-shown after marker reset, alias tip hidden when `/snap/bin/podman` symlink exists |
 
 ### Test Results
 
-Tested 2026-03-24 on WSL2. All distros pass 19/19.
+Tested 2026-03-24 on WSL2. All distros pass 18/18.
 
 | Distro | Result |
 |--------|--------|
-| Ubuntu 22.04 | 19/19 pass |
-| Ubuntu 24.04 | 19/19 pass |
-| Debian 12 | 19/19 pass |
-| CentOS 9 Stream | 19/19 pass |
-| Fedora 42 | 19/19 pass |
+| Ubuntu 22.04 | 18/18 pass |
+| Ubuntu 24.04 | 18/18 pass |
+| Debian 12 | 18/18 pass |
+| CentOS 9 Stream | 18/18 pass |
+| Fedora 42 | 18/18 pass |
 
 ### Test Environment Limitations
 
 - **D-Bus session bus**: `dbus-send --session` always fails inside LXD containers when using `su -` because no logind session exists. The wrapper correctly detects this as a missing dependency. The phase 5 tests tolerate `dbus-user-session` remaining flagged in container environments — this is a test infrastructure limitation, not a wrapper bug.
 - **`snap run` stderr**: On Ubuntu, `snap run` intercepts the wrapper's stderr output, making it invisible to the calling process. The tests invoke the wrapper binary directly with `SNAP`, `SNAP_VERSION`, and `SNAP_REVISION` environment variables set to bypass this. The wrapper logic is identical in both paths.
-- **`ldconfig` PATH**: On Debian, `/usr/sbin` is not in non-root users' default PATH. The wrapper uses the absolute path `/usr/sbin/ldconfig` to ensure the `libgpg-error` check works on all distros.
+- **`ldconfig` PATH**: On Debian, `/usr/sbin` is not in non-root users' default PATH. The install hook registers the snap's library directory via `ldconfig` during installation, so the wrapper does not need to check library availability at runtime.
 
 ### Container Naming
 

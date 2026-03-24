@@ -25,8 +25,8 @@ if lxc info "${CONTAINER_NAME}" &>/dev/null; then
         lxc start "${CONTAINER_NAME}"
     fi
 else
-    echo "Launching Ubuntu 22.04 container..."
-    lxc launch ubuntu:22.04 "${CONTAINER_NAME}" \
+    echo "Launching Ubuntu 24.04 container..."
+    lxc launch ubuntu:24.04 "${CONTAINER_NAME}" \
         -c security.nesting=true \
         -c security.syscalls.intercept.mknod=true \
         -c security.syscalls.intercept.setxattr=true

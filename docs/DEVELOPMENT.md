@@ -82,11 +82,11 @@ All scripts are in the `scripts/` directory.
 | `03_test_launch_vm.sh` | Host | Same as above but launches an LXD VM instead of a container |
 | `04_test_setup.sh` | Test container | Installs the snap, verifies install hook artefacts, creates a test user, installs `Go`/`BATS`/_Podman_ source for tiers 4-5 |
 | `05_run_tests.sh` | Test container | Five-tier test runner. Accepts `tier1`..`tier5` or `all` |
-| `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 + 5 on all, prints a summary table |
+| `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 and 5 on all, prints a summary table |
 | `07_test_setup_multi.sh` | Test container | Distro-agnostic setup — detects the distro, installs `snapd` and prerequisites, installs the snap, creates the test user. Handles Ubuntu, Debian, Fedora, and CentOS/RHEL |
 | `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
-| `10_wrapper_tests.sh` | Test container | 19-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
+| `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
 | `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
 | `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, and `ldconfig` config; warns about active Quadlet services |
@@ -166,19 +166,19 @@ Host (WSL2)                          LXD Build Container          LXD Test Conta
   ├─ pushes .snap + scripts                                    ├─ snap install --classic
   └─ triggers tests                                            ├─ creates test user
                                                                └─ ldconfig + policy.json
-                                                             05_run_tests.sh [tier1..4|all]
+                                                             05_run_tests.sh [tier1..5|all]
 
 06_test_multi_distro.sh                                      LXD Containers (per distro)
   ├─ iterates distro matrix ──────────────────────────────>  07_test_setup_multi.sh
   ├─ pushes .snap + scripts (parallel)                         ├─ installs snapd
-  └─ runs tiers 1-3 per distro                                 ├─ snap install --classic
+  └─ runs tiers 1-3, 5 per distro                               ├─ snap install --classic
                                                                └─ creates test user
-                                                             05_run_tests.sh [tier1..3]
+                                                             05_run_tests.sh [tier1..3, tier5]
 
 08_wrapper_test_launch.sh                                    LXD Containers (per distro)
   ├─ iterates distro matrix ──────────────────────────────>  09_wrapper_test_setup.sh
   ├─ pushes .snap + scripts (parallel)                         ├─ installs snapd (no rootless deps)
   └─ runs wrapper tests per distro                             ├─ snap install --classic
                                                                └─ creates test user
-                                                             10_wrapper_tests.sh [19 tests]
+                                                             10_wrapper_tests.sh [18 tests]
 ```

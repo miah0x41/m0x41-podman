@@ -1,4 +1,4 @@
-# Podman Snap (Classic Confinement)
+# Unofficial Podman Snap Package
 
 _Podman_ v5.8.1 with full _Quadlet_ (systemd integration) support, packaged as a classic confinement snap on `core22` (Ubuntu 22.04). Bundles all runtime dependencies — no additional packages needed on the host beyond `uidmap` for rootless mode. Tested end-to-end across five Linux distributions in both _rootless_ and _rootful_ modes.
 
@@ -63,12 +63,14 @@ Tested 2026-03-24. The snap runs on any Linux distribution with `glibc` >= 2.34 
 
 | Distro | `glibc` | Status | Host packages required |
 |--------|---------|--------|------------------------|
-| Ubuntu 22.04 | 2.35 | Pass | None |
-| Ubuntu 24.04 | 2.39 | Pass | None |
-| Debian 12 | 2.36 | Pass | None |
-| CentOS 9 Stream | 2.34 | Pass | None |
+| Ubuntu 22.04 | 2.35 | Pass | `apt install uidmap dbus-user-session` |
+| Ubuntu 24.04 | 2.39 | Pass | `apt install uidmap dbus-user-session` |
+| Debian 12 | 2.36 | Pass | `apt install uidmap dbus-user-session` |
+| CentOS 9 Stream | 2.34 | Pass | `dnf install shadow-utils` |
 | Fedora 42 | 2.41 | Fail | — |
 | Ubuntu 20.04 | 2.31 | Fail | — |
+
+Ubuntu Desktop includes `uidmap` and `dbus-user-session` by default. Server, minimal, and container images do not.
 
 Fedora 42 fails because `newuidmap` lacks the setuid bit inside LXD containers. This is an LXD/Fedora environment limitation — rootless would work on a real Fedora host with setuid `newuidmap`. Full Fedora validation on bare metal is pending.
 

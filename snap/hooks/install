@@ -29,10 +29,18 @@ chmod +x /usr/local/bin/podman
 # in /usr/lib/systemd/{system,user}-generators/ — the snap's copies
 # are invisible to systemd without these symlinks.
 mkdir -p /usr/lib/systemd/system-generators /usr/lib/systemd/user-generators
-ln -sf "${SNAP_CURRENT}/usr/lib/systemd/system-generators/podman-system-generator" \
-    /usr/lib/systemd/system-generators/podman-system-generator
-ln -sf "${SNAP_CURRENT}/usr/lib/systemd/user-generators/podman-user-generator" \
-    /usr/lib/systemd/user-generators/podman-user-generator
+if [ -f "${SNAP_CURRENT}/usr/lib/systemd/system-generators/podman-system-generator" ]; then
+    ln -sf "${SNAP_CURRENT}/usr/lib/systemd/system-generators/podman-system-generator" \
+        /usr/lib/systemd/system-generators/podman-system-generator
+else
+    echo "WARNING: system generator not found in snap — Quadlet may not work" >&2
+fi
+if [ -f "${SNAP_CURRENT}/usr/lib/systemd/user-generators/podman-user-generator" ]; then
+    ln -sf "${SNAP_CURRENT}/usr/lib/systemd/user-generators/podman-user-generator" \
+        /usr/lib/systemd/user-generators/podman-user-generator
+else
+    echo "WARNING: user generator not found in snap — Quadlet may not work" >&2
+fi
 
 # ---------- 3. Register snap libraries with ldconfig ----------
 # Child processes (conmon → crun) don't inherit LD_LIBRARY_PATH from

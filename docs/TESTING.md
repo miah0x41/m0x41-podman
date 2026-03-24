@@ -47,7 +47,7 @@ LXD VMs provide full kernel isolation — no shared kernel, no nesting flags. Cl
 
 ### Multi-Distro Test
 
-Launches LXD containers for five distros in parallel, installs the snap on each, and runs tiers 1-3.
+Launches LXD containers for five distros in parallel, installs the snap on each, and runs tiers 1-3 and 5.
 
 ```bash
 # Run all distros
@@ -96,39 +96,28 @@ See [WRAPPER.md](WRAPPER.md) for full details on test phases and what each test 
 
 ### `core22` Snap — Single Distro (Ubuntu 24.04)
 
-Tested 2026-03-19 on WSL2.
+Tested 2026-03-24 on WSL2.
 
 | Tier | LXC Container | Description |
 |------|--------------|-------------|
 | 1 | 7/7 pass | Version, `crun`, `netavark`, overlay, `conmon`, config paths |
 | 2 | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
 | 3 | 6/6 pass | Rootful: run, build, pod, volume |
-| 4 | 0/31 (setup) | `BATS` `setup_suite` fails — Ubuntu 22.04's `skopeo` lacks `--preserve-digests` |
-
-Tier 4 failure is a test infrastructure issue: the upstream `BATS` harness requires a newer `skopeo` to prefetch test images. It does not indicate a functional regression.
+| 4 | 28/31 | `BATS` parity — 3 snap-specific failures (see [Known Failures](#known-failures)) |
+| 5a-5d | 16/16 pass | Install hook, Quadlet dry-run, live rootful/rootless Quadlet |
+| 5e | 46/51 | `BATS` quadlet tests — 5 failures in `252-quadlet.bats` |
 
 ### `core22` Snap — Multi-Distro
 
-Tested 2026-03-19 on WSL2. All distros run in parallel via `06_test_multi_distro.sh`.
+Tested 2026-03-24 on WSL2. All distros run in parallel via `06_test_multi_distro.sh`.
 
-| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Total |
-|--------|---------|------------|------------|------------|-------|
-| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | **21/21** |
-| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | **21/21** |
-| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | **21/21** |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | **21/21** |
-| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 12/21 |
-
-### `core24` Snap — Single Distro (Ubuntu 24.04)
-
-Tested 2026-03-19 on WSL2. Results identical in LXC container and LXD VM.
-
-| Tier | Result | Description |
-|------|--------|-------------|
-| 1 | 7/7 pass | Version, `crun`, `netavark`, overlay, `conmon` |
-| 2 | 8/8 pass | Rootless: run, build, pod, volume, unshare, DNS |
-| 3 | 6/6 pass | Rootful: run, build, pod, volume |
-| 4 | 28/31 | `BATS` parity — 3 snap-specific failures |
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (16) |
+|--------|---------|------------|------------|------------|-------------|
+| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 16/16 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 16/16 |
+| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 16/16 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 12/16 |
+| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 12/16 |
 
 ### Native Build (Ubuntu 24.04, VM)
 
@@ -146,21 +135,17 @@ The baseline — all tiers pass against _Podman_ built and installed natively (n
 
 Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_launch.sh`.
 
-| Distro | Wrapper Tests (19) |
+| Distro | Wrapper Tests (18) |
 |--------|--------------------|
-| Ubuntu 22.04 | **19/19 pass** |
-| Ubuntu 24.04 | **19/19 pass** |
-| Debian 12 | **19/19 pass** |
-| CentOS 9 Stream | **19/19 pass** |
-| Fedora 42 | **19/19 pass** |
+| Ubuntu 22.04 | **18/18 pass** |
+| Ubuntu 24.04 | **18/18 pass** |
+| Debian 12 | **18/18 pass** |
+| CentOS 9 Stream | **18/18 pass** |
+| Fedora 42 | **18/18 pass** |
 
 ## Known Failures
 
-### `core22` Tier 4: `BATS` `setup_suite` Abort (`skopeo` Too Old)
-
-Ubuntu 22.04's `skopeo` (v1.4.1) lacks the `--preserve-digests` flag used by the _Podman_ v5.8.1 `BATS` `setup_suite` to prefetch test images. All 31 tests are skipped because setup aborts. A newer `skopeo` would resolve this.
-
-### `core24` Tier 4: 3 `BATS` Failures (Snap Config Conflicts)
+### Tier 4: 3 `BATS` Failures (Snap Config Conflicts)
 
 | Test | Cause |
 |------|-------|
@@ -169,6 +154,10 @@ Ubuntu 22.04's `skopeo` (v1.4.1) lacks the `--preserve-digests` flag used by the
 | `empty string defaults` | Test expects a warning when no storage driver is configured; the snap always provides `CONTAINERS_STORAGE_CONF` |
 
 All three are snap-specific environment conflicts, not functional regressions. The same tests pass in the native build.
+
+### Tier 5e: 5 `252-quadlet.bats` Failures
+
+Five tests in `252-quadlet.bats` fail: `basic`, `envvar`, `userns`, `image files`, and `artifact`. The `artifact` test fails because `htpasswd` (`apache2-utils`) is not installed in the test container. The others are snap-specific environment conflicts similar to the tier 4 failures. Tests `253-podman-quadlet.bats` (9/9) and `254-podman-quadlet-multi.bats` (5/5) pass fully.
 
 ### Fedora 42: Rootless Failures in LXD
 

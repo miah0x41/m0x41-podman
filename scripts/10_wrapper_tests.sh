@@ -87,6 +87,14 @@ echo "===== PHASE 2: First Rootless Invocation ====="
 # Ensure clean state
 rm -rf "${MARKER_DIR}"
 
+# Temporarily move the install hook's shim out of the way so we can test
+# the "not aliased" path (alias tip should be shown when no shim exists).
+SHIM_MOVED=false
+if [ -f /usr/local/bin/podman ] && grep -q "m0x41-podman shim" /usr/local/bin/podman 2>/dev/null; then
+    mv /usr/local/bin/podman /usr/local/bin/podman.bak
+    SHIM_MOVED=true
+fi
+
 echo "--- first run: capturing stderr ---"
 STDERR_P2="/tmp/wrapper-phase2-stderr"
 run_as_testuser "${PODMAN_CMD} --version" "${STDERR_P2}" || true
@@ -135,6 +143,11 @@ if grep -q "To suppress this warning" "${STDERR_P2}" 2>/dev/null; then
     pass "first run: suppress instructions shown"
 else
     fail "first run: suppress instructions not shown"
+fi
+
+# Restore the shim if we moved it
+if [ "${SHIM_MOVED}" = true ]; then
+    mv /usr/local/bin/podman.bak /usr/local/bin/podman
 fi
 
 # ============================================================

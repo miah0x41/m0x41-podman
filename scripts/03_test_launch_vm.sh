@@ -31,8 +31,8 @@ if lxc info "${CONTAINER_NAME}" &>/dev/null; then
         lxc start "${CONTAINER_NAME}"
     fi
 else
-    echo "Launching Ubuntu 22.04 VM..."
-    lxc launch ubuntu:22.04 "${CONTAINER_NAME}" --vm \
+    echo "Launching Ubuntu 24.04 VM..."
+    lxc launch ubuntu:24.04 "${CONTAINER_NAME}" --vm \
         -c security.secureboot=false
 
     echo "Waiting for VM boot and networking (this takes longer than containers)..."

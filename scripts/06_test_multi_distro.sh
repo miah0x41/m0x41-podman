@@ -51,6 +51,7 @@ count_for_tier() {
         tier2) echo "${TIER2_COUNT}" ;;
         tier3) echo "${TIER3_COUNT}" ;;
         tier5) echo "${TIER5_COUNT}" ;;
+        *)     echo "0" ;;
     esac
 }
 
