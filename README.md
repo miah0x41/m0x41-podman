@@ -85,6 +85,10 @@ m0x41-podman run --rm docker.io/library/alpine echo "hello from snap"
 podman run --rm docker.io/library/alpine echo "hello from snap"
 ```
 
+### First-Run Messages
+
+On the first rootless invocation, the snap prints a welcome message with alias instructions (if not already aliased). If host dependencies are missing, it prints a warning with the exact install command for your distro. See [docs/WRAPPER.md](docs/WRAPPER.md) for full details on what is checked and how to suppress warnings.
+
 ## How This Was Tested
 
 The snap was developed through a structured process, with each stage informing the next:
@@ -143,11 +147,13 @@ docs/
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology and results
   COMPONENTS.md                 # Upstream components, versions, and licenses
+  WRAPPER.md                    # Wrapper script behaviour, messages, and testing
 ```
 
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment setup, prerequisites, script reference
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests, multi-distro methodology, results
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
+- **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper script behaviour, first-run messages, dependency detection, and test results
 
 ## Acknowledgements
 

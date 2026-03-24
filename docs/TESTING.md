@@ -66,11 +66,29 @@ Launches LXD containers for five distros in parallel, installs the snap on each,
 /usr/bin/sg lxd -c "lxc exec snap-test-22-debian-12 -- /root/05_run_tests.sh tier1"
 ```
 
+### Wrapper Dependency Tests
+
+Validates the wrapper's first-run hello message, dependency detection, marker file logic, and alias tip across five distros. These tests use a minimal container setup that deliberately omits rootless dependencies.
+
+```bash
+# All distros in parallel
+/usr/bin/sg lxd -c "./scripts/08_wrapper_test_launch.sh"
+
+# With cleanup
+/usr/bin/sg lxd -c "./scripts/08_wrapper_test_launch.sh --cleanup"
+
+# Re-run on existing container
+/usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- /root/10_wrapper_tests.sh"
+```
+
+See [WRAPPER.md](WRAPPER.md) for full details on test phases and what each test validates.
+
 ### Interactive Debugging
 
 ```bash
 /usr/bin/sg lxd -c "lxc exec m0x41-podman-test -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-test-22-centos-9 -- bash"
+/usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- bash"
 ```
 
 ## Test Results
@@ -122,6 +140,18 @@ The baseline — all tiers pass against _Podman_ built and installed natively (n
 | 3 | 7/7 pass | Rootless functional + `BATS` smoke (31 tests) |
 | 4 | 352/352 pass | Root `BATS` smoke (31) + `Ginkgo` integration (321 specs) |
 | 5 | 544/548 | API v2 tests (4 upstream failures in OCI artifact tests) |
+
+### Wrapper Dependency Detection — Multi-Distro
+
+Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_launch.sh`.
+
+| Distro | Wrapper Tests (19) |
+|--------|--------------------|
+| Ubuntu 22.04 | **19/19 pass** |
+| Ubuntu 24.04 | **19/19 pass** |
+| Debian 12 | **19/19 pass** |
+| CentOS 9 Stream | **19/19 pass** |
+| Fedora 42 | **19/19 pass** |
 
 ## Known Failures
 

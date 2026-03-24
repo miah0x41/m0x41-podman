@@ -51,9 +51,13 @@ The snap entry point is `bin/podman-wrapper`, not the _Podman_ binary directly. 
 
 1. Prepends the snap's binary directories to `PATH` so _Podman_ can find `netavark`, `aardvark-dns`, `conmon`, etc.
 2. Sets `LD_LIBRARY_PATH` so _Podman_ can find bundled shared libraries (`libgpgme`, `libyajl`, etc.)
-3. Execs the real `podman` binary
+3. Detects missing host dependencies for rootless mode and prints actionable guidance
+4. Shows a one-time welcome message with alias instructions on first run
+5. Execs the real `podman` binary
 
 Child processes spawned by `conmon` (e.g. `crun`) don't inherit `LD_LIBRARY_PATH`, which is why the test setup also registers the snap's library directory with `ldconfig`.
+
+See [WRAPPER.md](WRAPPER.md) for full details on the wrapper's messages, marker files, and dependency detection logic.
 
 ### Configuration Files
 
@@ -80,7 +84,10 @@ All scripts are in the `scripts/` directory.
 | `05_run_tests.sh` | Test container | Four-tier test runner. Accepts `tier1`, `tier2`, `tier3`, `tier4`, or `all` |
 | `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 on all, prints a summary table |
 | `07_test_setup_multi.sh` | Test container | Distro-agnostic setup — detects the distro, installs `snapd` and prerequisites, installs the snap, creates the test user. Handles Ubuntu, Debian, Fedora, and CentOS/RHEL |
-| `podman-wrapper` | Inside snap | Entry point script that sets `PATH` and `LD_LIBRARY_PATH` before exec'ing _Podman_ |
+| `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
+| `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
+| `10_wrapper_tests.sh` | Test container | 19-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
+| `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
 
 ## Key Compatibility Issues
 
@@ -165,4 +172,11 @@ Host (WSL2)                          LXD Build Container          LXD Test Conta
   └─ runs tiers 1-3 per distro                                 ├─ snap install --classic
                                                                └─ creates test user
                                                              05_run_tests.sh [tier1..3]
+
+08_wrapper_test_launch.sh                                    LXD Containers (per distro)
+  ├─ iterates distro matrix ──────────────────────────────>  09_wrapper_test_setup.sh
+  ├─ pushes .snap + scripts (parallel)                         ├─ installs snapd (no rootless deps)
+  └─ runs wrapper tests per distro                             ├─ snap install --classic
+                                                               └─ creates test user
+                                                             10_wrapper_tests.sh [19 tests]
 ```
