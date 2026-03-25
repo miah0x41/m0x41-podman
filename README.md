@@ -55,6 +55,8 @@ Quadlet has been validated end-to-end: the snap's install hook creates a `/usr/l
 
 See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the shim vs wrapper distinction, and detailed test results.
 
+> **Note:** `podman generate systemd` is deprecated upstream and is not supported by this snap. It hardcodes revision-specific snap paths that break on refresh. Use Quadlet `.container` files instead.
+
 ## Distro Compatibility
 
 Tested 2026-03-24. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`.
