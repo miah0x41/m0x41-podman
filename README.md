@@ -153,7 +153,7 @@ The snap is validated with a five-tier test suite covering command validation, r
 | 2 | 8 | Rootless: pull, run, build, pod, volume, DNS |
 | 3 | 6 | Rootful: run, build, pod, volume |
 | 4 | 31 | Upstream BATS smoke tests |
-| 5 | 16+ | Install hook artefacts, Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS quadlet tests, Go e2e quadlet tests |
+| 5 | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests, Go e2e quadlet tests |
 
 See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro results, and known failures.
 
