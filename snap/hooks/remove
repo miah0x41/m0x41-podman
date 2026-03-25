@@ -27,11 +27,23 @@ if [ -L /usr/lib/systemd/user-generators/podman-user-generator ] && \
     rm -f /usr/lib/systemd/user-generators/podman-user-generator
 fi
 
-# ---------- 4. Remove ldconfig config ----------
+# ---------- 4. Remove podman API socket units ----------
+# Only remove the socket symlink if it points to our snap.
+if [ -L /usr/lib/systemd/user/podman.socket ] && \
+   readlink /usr/lib/systemd/user/podman.socket 2>/dev/null | grep -q m0x41-podman; then
+    rm -f /usr/lib/systemd/user/podman.socket
+fi
+# Only remove the service if it references our shim.
+if [ -f /usr/lib/systemd/user/podman.service ] && \
+   grep -q "/usr/local/bin/podman" /usr/lib/systemd/user/podman.service 2>/dev/null; then
+    rm -f /usr/lib/systemd/user/podman.service
+fi
+
+# ---------- 5. Remove ldconfig config ----------
 rm -f /etc/ld.so.conf.d/podman-snap.conf
 ldconfig 2>/dev/null || true
 
-# ---------- 5. Reload systemd ----------
+# ---------- 6. Reload systemd ----------
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true
 fi

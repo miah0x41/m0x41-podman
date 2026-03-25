@@ -32,6 +32,28 @@ podman run --rm docker.io/library/alpine echo "hello from snap"
 
 For rootless mode on server or minimal installs, you may need: `sudo apt install uidmap dbus-user-session`
 
+### Podman API Socket
+
+Tools like Traefik, Dozzle, and Beszel require the Podman API socket. The install hook registers the socket unit files; enable the socket with:
+
+```bash
+systemctl --user enable --now podman.socket
+```
+
+### Migrating from `apt`-Installed Podman
+
+If you previously had _Podman_ installed via `apt`, you must clean up stale network state after switching to the snap. The old `aardvark-dns` process holds references to a different network namespace, breaking inter-container routing.
+
+```bash
+sudo apt remove podman
+podman stop --all
+pkill aardvark-dns
+rm -rf /run/user/$(id -u)/containers/networks/aardvark-dns
+systemctl --user restart podman.socket
+```
+
+Then restart your container services. If you had previously enabled `podman.socket`, re-enable it — the snap provides its own unit files that replace the ones removed with the `apt` package.
+
 ## Quadlet (Systemd Integration)
 
 _Podman_ 5.x includes _Quadlet_ — a native mechanism for running containers as systemd services. This snap supports Quadlet out of the box, with systemd generators registered automatically by the install hook. Both rootful and rootless Quadlet are supported.
@@ -131,7 +153,7 @@ The snap is validated with a five-tier test suite covering command validation, r
 | 2 | 8 | Rootless: pull, run, build, pod, volume, DNS |
 | 3 | 6 | Rootful: run, build, pod, volume |
 | 4 | 31 | Upstream BATS smoke tests |
-| 5 | 16+ | Install hook artefacts, Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS quadlet tests, Go e2e quadlet tests |
+| 5 | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests, Go e2e quadlet tests |
 
 See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro results, and known failures.
 
