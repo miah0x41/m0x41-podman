@@ -36,6 +36,8 @@ Both set the same core environment (`PATH`, `LD_LIBRARY_PATH`, `CONTAINERS_CONF`
 | `/usr/local/bin/podman` | Script | Shim that sets snap environment and execs `podman` |
 | `/usr/lib/systemd/system-generators/podman-system-generator` | Symlink | Rootful Quadlet generator |
 | `/usr/lib/systemd/user-generators/podman-user-generator` | Symlink | Rootless Quadlet generator |
+| `/usr/lib/systemd/user/podman.socket` | Symlink | Podman API socket unit (user must enable manually) |
+| `/usr/lib/systemd/user/podman.service` | Script | Podman API service using the snap's shim |
 | `/etc/ld.so.conf.d/podman-snap.conf` | Config | Registers snap's bundled libraries with `ldconfig` |
 | `/etc/containers/policy.json` | Copy | Image signature policy (only if not already present) |
 
@@ -103,9 +105,10 @@ Running `snap remove m0x41-podman` triggers the remove hook, which:
 
 1. Warns if active Quadlet-generated services are detected
 2. Removes the `/usr/local/bin/podman` shim (only if it contains the snap's marker comment)
-3. Removes the generator symlinks
-4. Removes the `ldconfig` configuration
-5. Runs `systemctl daemon-reload`
+3. Removes the generator symlinks (only if they point to this snap)
+4. Removes the Podman API socket and service units (only if they reference this snap)
+5. Removes the `ldconfig` configuration
+6. Runs `systemctl daemon-reload`
 
 The remove hook does **not** delete `/etc/containers/policy.json` (may be user-customised or used by other tools) or any user-created `.container`/`.volume`/`.network` definition files.
 

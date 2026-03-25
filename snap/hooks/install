@@ -59,7 +59,34 @@ if [ ! -f /etc/containers/policy.json ]; then
     cp "${SNAP_CURRENT}/etc/containers/policy.json" /etc/containers/policy.json
 fi
 
-# ---------- 5. Reload systemd ----------
+# ---------- 5. Install podman API socket units ----------
+# The snap ships podman.socket and podman.service but the service has
+# /usr/bin/podman hardcoded. Symlink the socket (no path references) and
+# install a corrected service that uses the shim. Users can then enable
+# the socket with: systemctl --user enable --now podman.socket
+mkdir -p /usr/lib/systemd/user
+ln -sf "${SNAP_CURRENT}/usr/lib/systemd/user/podman.socket" \
+    /usr/lib/systemd/user/podman.socket
+cat > /usr/lib/systemd/user/podman.service <<'SVCUNIT'
+[Unit]
+Description=Podman API Service
+Requires=podman.socket
+After=podman.socket
+Documentation=man:podman-system-service(1)
+StartLimitIntervalSec=0
+
+[Service]
+Delegate=true
+Type=exec
+KillMode=process
+Environment=LOGGING="--log-level=info"
+ExecStart=/usr/local/bin/podman $LOGGING system service
+
+[Install]
+WantedBy=default.target
+SVCUNIT
+
+# ---------- 6. Reload systemd ----------
 # Make systemd discover the newly-registered generators.
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true
