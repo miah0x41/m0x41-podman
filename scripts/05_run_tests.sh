@@ -448,7 +448,7 @@ CEOF
         SNAP_BINARY=$(command -v ${PODMAN}) || true
         export QUADLET="${SNAP}/usr/libexec/podman/quadlet"
 
-        for batsfile in 252-quadlet.bats 253-podman-quadlet.bats 254-podman-quadlet-multi.bats; do
+        for batsfile in 251-system-service.bats 252-quadlet.bats 253-podman-quadlet.bats 254-podman-quadlet-multi.bats 270-socket-activation.bats; do
             if [ -f "${PODMAN_SRC}/test/system/${batsfile}" ]; then
                 echo "--- ${batsfile} ---"
                 cd "${PODMAN_SRC}"
