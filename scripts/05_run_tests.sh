@@ -317,6 +317,20 @@ tier5() {
         fail "libyajl not in ldconfig cache"
     fi
 
+    echo "--- podman.socket unit installed ---"
+    if [ -L /usr/lib/systemd/user/podman.socket ]; then
+        pass "podman.socket symlink exists"
+    else
+        fail "podman.socket symlink missing"
+    fi
+
+    echo "--- podman.service unit installed ---"
+    if [ -f /usr/lib/systemd/user/podman.service ] && grep -q "/usr/local/bin/podman" /usr/lib/systemd/user/podman.service 2>/dev/null; then
+        pass "podman.service references shim"
+    else
+        fail "podman.service missing or wrong path"
+    fi
+
     # --- 5b: Quadlet dry-run ---
     echo ""
     echo "--- 5b: Quadlet dry-run ---"
