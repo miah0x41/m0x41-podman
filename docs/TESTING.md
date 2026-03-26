@@ -182,6 +182,60 @@ The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and
 
 Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fails in LXD on WSL2 due to missing kernel `nftables` modules. On hosts with full `nftables` support, this may work.
 
+## Full Upstream BATS Suite
+
+In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (78 files, ~780 tests). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
+
+### Running the Full Suite
+
+```bash
+# Root mode (inside the test container, after 04_test_setup.sh)
+/root/11_run_bats_full.sh root
+
+# Rootless mode
+/root/11_run_bats_full.sh rootless
+```
+
+The script runs every `*.bats` file in the upstream `test/system/` directory, groups results by functional category, and classifies failures into four buckets:
+
+| Classification | Meaning |
+|---------------|---------|
+| **Snap** | Snap-specific environment conflict (`CONTAINERS_CONF` override, path issues) |
+| **LXD** | LXD container limitation (`newuidmap` setuid, namespace permissions) |
+| **Infra** | Missing test infrastructure (registry, `htpasswd`, `skopeo`, test binary) |
+| **Other** | Requires manual investigation |
+
+### Results — Root Mode (Ubuntu 24.04, LXC)
+
+Tested 2026-03-25 on WSL2.
+
+| Category | Tests | Pass | Skip | Snap | LXD | Infra | Other |
+|----------|-------|------|------|------|-----|-------|-------|
+| System & Info | 116 | 83 | 12 | 6 | 0 | 0 | 15 |
+| Container Lifecycle | 149 | 130 | 11 | 5 | 0 | 0 | 3 |
+| Images | 101 | 76 | 2 | 3 | 0 | 18 | 2 |
+| Volumes & Storage | 59 | 52 | 4 | 0 | 0 | 0 | 3 |
+| Networking | 111 | 20 | 89 | 2 | 0 | 0 | 0 |
+| Pods & Kube | 59 | 53 | 2 | 0 | 0 | 2 | 2 |
+| Systemd & Quadlet | 113 | 40 | 12 | 15 | 0 | 0 | 46 |
+| Security & Namespaces | 47 | 18 | 25 | 0 | 3 | 0 | 1 |
+| Advanced | 27 | 8 | 19 | 0 | 0 | 0 | 0 |
+| **Total** | **782** | **480** | **176** | **31** | **3** | **20** | **72** |
+
+**480/782 tests pass (61%).** 176 tests are skipped (SELinux not available, `pasta` not bundled, checkpoint/restore not supported, remote-only tests). Of the 126 failures:
+
+- **31 snap-specific** — environment variable conflicts where the snap's `CONTAINERS_CONF`/`CONTAINERS_STORAGE_CONF` override the test harness's temporary configs. Not functional regressions.
+- **3 LXD** — user namespace tests that require setuid `newuidmap`, which lacks the setuid bit in LXD containers.
+- **20 infra** — tests requiring a container registry (`htpasswd`), `skopeo --preserve-digests`, or the `podman_testing` binary, none of which are available in the test container.
+- **72 other** — includes 46 Systemd & Quadlet tests that fail due to cascading `setup_suite` failures (effectively infra), plus tests requiring manual investigation.
+
+### Notes
+
+- **Networking skips (89)** are almost entirely `505-networking-pasta.bats` — the snap uses `slirp4netns`, not `pasta`.
+- **Security skips (25)** include 21 SELinux tests — SELinux is not enabled in Ubuntu LXD containers.
+- **Advanced skips (19)** include checkpoint/restore, migration, SSH, and remote tests.
+- The "Other" count is inflated by cascading `setup_suite` failures in `252-quadlet.bats` and `253-podman-quadlet.bats`, which should be reclassified as infra. The failure classifier is heuristic and will be refined.
+
 ## Test Environment
 
 All tests were run on:

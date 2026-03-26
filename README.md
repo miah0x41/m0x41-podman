@@ -155,7 +155,7 @@ The snap is validated with a five-tier test suite covering command validation, r
 | 4 | 31 | Upstream BATS smoke tests |
 | 5 | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests, Go e2e quadlet tests |
 
-See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro results, and known failures.
+The full upstream BATS suite (78 files, 782 tests) can also be run against the snap. Of the 782 tests, 480 pass, 176 are skipped (SELinux, `pasta`, checkpoint), and 126 fail — categorised as snap-specific (31), LXD-limited (3), missing infrastructure (20), or requiring investigation (72). See [docs/TESTING.md](docs/TESTING.md) for the full categorised results, multi-distro tables, and known failures.
 
 ## Why Classic Confinement?
 
