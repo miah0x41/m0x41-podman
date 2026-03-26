@@ -87,6 +87,7 @@ All scripts are in the `scripts/` directory.
 | `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
 | `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
+| `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, ~780 tests) with categorised failure classification. Accepts `root` or `rootless` |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
 | `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
 | `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, and `ldconfig` config; warns about active Quadlet services |

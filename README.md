@@ -79,6 +79,22 @@ See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the s
 
 > **Note:** `podman generate systemd` is deprecated upstream and is not supported by this snap. It hardcodes revision-specific snap paths that break on refresh. Use Quadlet `.container` files instead.
 
+## Configuration
+
+The snap sets `CONTAINERS_CONF` to ensure _Podman_ finds its bundled components (`crun`, `conmon`, `netavark`, `slirp4netns`). This env var replaces the normal config chain, which means user-created `containers.conf` files are not loaded.
+
+To customise _Podman_ settings, use `CONTAINERS_CONF_OVERRIDE` — it is loaded **last**, even when `CONTAINERS_CONF` is set:
+
+```bash
+export CONTAINERS_CONF_OVERRIDE="$HOME/.config/containers/overrides.conf"
+```
+
+Settings that are safe to override: `cgroup_manager`, `events_logger`, `log_driver`, `log_size_max`, `env`, `init_path`, `infra_image`, and any setting not listed below.
+
+> **Do not override** `helper_binaries_dir`, `conmon_path`, `crun` runtime path, `netavark_path`, or `default_rootless_network_cmd` — these point to the snap's bundled binaries and changing them will break the snap.
+
+`CONTAINERS_REGISTRIES_CONF` and `CONTAINERS_STORAGE_CONF` are also set by the snap and should not be overridden.
+
 ## Distro Compatibility
 
 Tested 2026-03-24. The snap runs on any Linux distribution with `glibc` >= 2.34 and `snapd`.
@@ -155,7 +171,7 @@ The snap is validated with a five-tier test suite covering command validation, r
 | 4 | 31 | Upstream BATS smoke tests |
 | 5 | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests, Go e2e quadlet tests |
 
-See [docs/TESTING.md](docs/TESTING.md) for how to run tests, multi-distro results, and known failures.
+The full upstream BATS suite (78 files, 782 tests) can also be run against the snap. Of the 782 tests, 480 pass, 176 are skipped (SELinux, `pasta`, checkpoint), and 126 fail — categorised as snap-specific (31), LXD-limited (3), missing infrastructure (20), or requiring investigation (72). See [docs/TESTING.md](docs/TESTING.md) for the full categorised results, multi-distro tables, and known failures.
 
 ## Why Classic Confinement?
 
