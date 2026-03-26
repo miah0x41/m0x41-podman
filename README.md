@@ -54,6 +54,28 @@ systemctl --user restart podman.socket
 
 Then restart your container services. If you had previously enabled `podman.socket`, re-enable it — the snap provides its own unit files that replace the ones removed with the `apt` package.
 
+## Differences from Native _Podman_
+
+The snap is not a drop-in replacement for a natively installed _Podman_. These are the most significant differences — see [docs/USER.md](docs/USER.md) for the complete user guide.
+
+**Rootless networking uses `slirp4netns`, not `pasta`.** Native _Podman_ v5.x defaults to `pasta` for faster rootless networking. The snap uses `slirp4netns` because `pasta` is not available on the `core22` base. Rootless networking works but may be slower, and `--network pasta` will fail.
+
+**Configuration files in standard locations are ignored.** The snap sets `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` to point to its own bundled configs. Any `containers.conf`, `storage.conf`, or `registries.conf` you place in `~/.config/containers/` or `/etc/containers/` will not be loaded. To customise `containers.conf` settings, use `CONTAINERS_CONF_OVERRIDE`:
+
+```bash
+export CONTAINERS_CONF_OVERRIDE="$HOME/.config/containers/overrides.conf"
+```
+
+There is no override mechanism for `storage.conf` or `registries.conf`. See [docs/USER.md](docs/USER.md#configuration) for which settings are safe to override and which will break the snap.
+
+**Rootless mode requires host packages.** `uidmap` and `dbus-user-session` cannot be bundled (they require setuid bits and a system D-Bus service). Non-Ubuntu distros also need `iptables` for rootful networking. See [Distro Compatibility](#distro-compatibility) for per-distro install commands.
+
+**Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` hardcodes snap revision paths that break on refresh — use Quadlet instead.
+
+**The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, and configures library paths via `ldconfig`. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list.
+
+**Architecture is `amd64` only** with a `glibc` >= 2.34 floor. Distros older than ~2021 are not supported.
+
 ## Quadlet (Systemd Integration)
 
 _Podman_ 5.x includes _Quadlet_ — a native mechanism for running containers as systemd services. This snap supports Quadlet out of the box, with systemd generators registered automatically by the install hook. Both rootful and rootless Quadlet are supported.
@@ -78,22 +100,6 @@ Quadlet has been validated end-to-end: the snap's install hook creates a `/usr/l
 See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the shim vs wrapper distinction, and detailed test results.
 
 > **Note:** `podman generate systemd` is deprecated upstream and is not supported by this snap. It hardcodes revision-specific snap paths that break on refresh. Use Quadlet `.container` files instead.
-
-## Configuration
-
-The snap sets `CONTAINERS_CONF` to ensure _Podman_ finds its bundled components (`crun`, `conmon`, `netavark`, `slirp4netns`). This env var replaces the normal config chain, which means user-created `containers.conf` files are not loaded.
-
-To customise _Podman_ settings, use `CONTAINERS_CONF_OVERRIDE` — it is loaded **last**, even when `CONTAINERS_CONF` is set:
-
-```bash
-export CONTAINERS_CONF_OVERRIDE="$HOME/.config/containers/overrides.conf"
-```
-
-Settings that are safe to override: `cgroup_manager`, `events_logger`, `log_driver`, `log_size_max`, `env`, `init_path`, `infra_image`, and any setting not listed below.
-
-> **Do not override** `helper_binaries_dir`, `conmon_path`, `crun` runtime path, `netavark_path`, or `default_rootless_network_cmd` — these point to the snap's bundled binaries and changing them will break the snap.
-
-`CONTAINERS_REGISTRIES_CONF` and `CONTAINERS_STORAGE_CONF` are also set by the snap and should not be overridden.
 
 ## Distro Compatibility
 
@@ -186,6 +192,7 @@ snap/                           # Bundled container engine configuration
   hooks/remove                  # Remove hook (cleanup)
 scripts/                        # Build, test, and multi-distro automation
 docs/
+  USER.md                       # User guide: snap vs native Podman differences
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology and results
   COMPONENTS.md                 # Upstream components, versions, and licenses
@@ -193,6 +200,7 @@ docs/
   QUADLET.md                    # Quadlet (systemd integration) and install hooks
 ```
 
+- **[docs/USER.md](docs/USER.md)** — User guide: all differences from native _Podman_, configuration, limitations
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment, prerequisites, script reference, architecture diagram
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests, multi-distro methodology, results
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
