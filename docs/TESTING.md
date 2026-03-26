@@ -231,10 +231,11 @@ Tested 2026-03-25 on WSL2.
 
 ### Notes
 
-- **Networking skips (89)** are almost entirely `505-networking-pasta.bats` — the snap uses `slirp4netns`, not `pasta`.
+- **Networking skips (89)** are almost entirely `505-networking-pasta.bats` (86 tests). The snap bundles `slirp4netns` for rootless networking because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. These tests would pass on a system with `pasta` installed natively.
+- **Snap-specific failures (31)** are caused by the snap setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` as environment variables, which override the test harness's temporary configs. This is required for the snap to function (see [Configuration](#configuration) in the README). Users can customise non-critical settings via `CONTAINERS_CONF_OVERRIDE`.
 - **Security skips (25)** include 21 SELinux tests — SELinux is not enabled in Ubuntu LXD containers.
 - **Advanced skips (19)** include checkpoint/restore, migration, SSH, and remote tests.
-- The "Other" count is inflated by cascading `setup_suite` failures in `252-quadlet.bats` and `253-podman-quadlet.bats`, which should be reclassified as infra. The failure classifier is heuristic and will be refined.
+- The **"Other" count (72)** is inflated by cascading `setup_suite` failures in `252-quadlet.bats` and `253-podman-quadlet.bats` (46 tests), which are effectively infra failures. The failure classifier is heuristic and will be refined.
 
 ## Test Environment
 
