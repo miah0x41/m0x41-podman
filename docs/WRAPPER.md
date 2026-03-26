@@ -46,7 +46,7 @@ The checks are:
 | `command -v newgidmap` | `uidmap` package missing | Same as above |
 | `dbus-send --session` | `dbus-user-session` missing or no session bus | Requires a running system service |
 
-Note: `libgpg-error` was previously checked here but is now handled by the install hook's `ldconfig` registration and no longer appears in the wrapper's dependency checks.
+Note: `libgpg-error` was previously checked here but was removed because the install hook's `ldconfig` registration makes host-installed libraries discoverable by child processes (`conmon` → `crun`). The library itself must still exist on the host — on Debian/Ubuntu it is typically already present; on Fedora/CentOS it may need explicit installation (`dnf install libgpg-error`).
 
 The install command adapts to the distro:
 
@@ -82,7 +82,7 @@ The exact command is printed as part of the warning message. The snap revision (
 
 ## Root Behaviour
 
-The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is checked only in _rootless_ context to avoid false positives when the library is present but `ldconfig` isn't in the non-root user's PATH.
+The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is resolved via the install hook's `ldconfig` registration rather than wrapper-level checks.
 
 ## Testing
 

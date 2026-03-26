@@ -13,11 +13,11 @@ description: |
 
   This is an unofficial snap built directly from upstream Podman v5.8.1
   sources. It bundles all runtime dependencies (`crun`, `conmon`, `netavark`,
-  `aardvark-dns`, `fuse-overlayfs`, `slirp4netns`, `catatonit`) so no
-  additional host packages are required, except `iptables` on non-Ubuntu
-  distros (Debian, CentOS, Fedora). Rootless mode requires `uidmap` and
-  `dbus-user-session` on the host (installed by default on Ubuntu Desktop,
-  but not on server or minimal installs). The snap's install hook
+  `aardvark-dns`, `fuse-overlayfs`, `slirp4netns`, `catatonit`). Rootless
+  mode requires `uidmap` and `dbus-user-session` on the host (installed by
+  default on Ubuntu Desktop, but not on server or minimal installs).
+  Non-Ubuntu distros (Debian, CentOS, Fedora) also require `iptables` for
+  rootful networking. The snap's install hook
   automatically configures library paths, systemd generators for Quadlet,
   and places `podman` on PATH at `/usr/local/bin/podman`.
 
@@ -31,8 +31,8 @@ description: |
   * Ubuntu 22.04 — pass (`apt install uidmap dbus-user-session`)
   * Ubuntu 24.04 — pass (`apt install uidmap dbus-user-session`)
   * Debian 12 — pass (`apt install uidmap dbus-user-session iptables`)
-  * CentOS 9 Stream — pass (`dnf install shadow-utils iptables-nft`)
-  * Fedora 42 — rootful pass (`dnf install shadow-utils iptables-nft`);
+  * CentOS 9 Stream — pass (`dnf install shadow-utils dbus-daemon iptables-nft libgpg-error`)
+  * Fedora 42 — rootful pass (`dnf install shadow-utils dbus-daemon iptables-nft libgpg-error`);
     rootless fails in LXD due to missing setuid on `newuidmap`
 
   This snap has been extensively tested across the distributions listed
