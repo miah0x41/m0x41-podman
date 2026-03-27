@@ -12,7 +12,7 @@ The snap is validated with a five-tier test suite. Each tier builds on the confi
 | 2 | Rootless Functional | 8 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping — all as an unprivileged user |
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
 | 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.1 source tree, with `PODMAN` pointed at the snap binary |
-| 5 | Quadlet / Install Hook | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), Go e2e quadlet tests (gated) |
+| 5 | Quadlet / Install Hook | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), Go e2e quadlet tests (gated) |
 
 All tests in tiers 1-3 run through `snap run m0x41-podman` — the snap's actual entry point, not a bypass of the binary. Tier 5 tests the `/usr/local/bin/podman` shim created by the install hook.
 
@@ -104,20 +104,20 @@ Tested 2026-03-25 on WSL2.
 | 2 | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
 | 3 | 6/6 pass | Rootful: run, build, pod, volume |
 | 4 | 28/31 | `BATS` parity — 3 snap-specific failures (see [Known Failures](#known-failures)) |
-| 5a-5d | 18/18 pass | Install hook (including socket units), Quadlet dry-run, live rootful/rootless Quadlet |
+| 5a-5d | 20/20 pass | Install hook (including socket units, man pages), Quadlet dry-run, live rootful/rootless Quadlet |
 | 5e | 68/73 | `BATS` system-service (19/19), socket-activation (3/3), quadlet 252-254 — 5 failures in `252-quadlet.bats` |
 
 ### `core22` Snap — Multi-Distro
 
 Tested 2026-03-25 on WSL2. All distros run in parallel via `06_test_multi_distro.sh`.
 
-| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (18) |
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (20) |
 |--------|---------|------------|------------|------------|-------------|
-| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 18/18 |
-| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 18/18 |
-| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 18/18 |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 17/18 |
-| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 16/18 |
+| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 20/20 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 19/20 |
+| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 18/20 |
 
 ### Native Build (Ubuntu 24.04, VM)
 

@@ -41,7 +41,7 @@ The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as t
 | `go` | nil | Downloads `Go` 1.24.2. Excluded from the final snap (`prime: [-*]`) — build-time only |
 | `crun` | nil | Clones `crun` 1.19.1, runs `./autogen.sh && ./configure && make && make install` |
 | `netavark` | nil | Downloads pre-built `netavark` and `aardvark-dns` binaries from GitHub Releases |
-| `podman` | nil | Clones _Podman_ v5.8.1, builds `podman`, `podman-remote`, `rootlessport`, `quadlet` |
+| `podman` | nil | Clones _Podman_ v5.8.1, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
 | `configs` | dump | Copies `containers.conf`, `storage.conf`, `registries.conf`, `policy.json` into the snap |
 | `wrapper` | dump | Copies the `podman-wrapper` shell script that sets `PATH` and `LD_LIBRARY_PATH` |
 
@@ -89,8 +89,8 @@ All scripts are in the `scripts/` directory.
 | `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, ~780 tests) with categorised failure classification. Accepts `root` or `rootless` |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
-| `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
-| `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, and `ldconfig` config; warns about active Quadlet services |
+| `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, symlinks man pages, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
+| `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, `ldconfig` config, and man page symlinks; warns about active Quadlet services |
 
 ## Key Compatibility Issues
 

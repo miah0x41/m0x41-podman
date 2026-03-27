@@ -25,7 +25,7 @@ case "${ID}" in
     ubuntu)
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
-        apt-get install -y -qq uidmap dbus-user-session 2>&1 | tail -5
+        apt-get install -y -qq uidmap dbus-user-session man-db 2>&1 | tail -5
 
         # Ubuntu 20.04 ships snapd 2.54; core22 base needs >= 2.62
         if [ "${VERSION_ID}" = "20.04" ]; then
@@ -39,7 +39,7 @@ case "${ID}" in
         apt-get update -qq
         # squashfuse required for snapd in LXD containers (can't mount squashfs natively)
         # iptables required by netavark for rootful container networking (not installed by default)
-        apt-get install -y -qq snapd squashfuse fuse uidmap dbus-user-session iptables 2>&1 | tail -5
+        apt-get install -y -qq snapd squashfuse fuse uidmap dbus-user-session iptables man-db 2>&1 | tail -5
 
         # Enable unprivileged user namespaces if restricted
         if [ -f /proc/sys/kernel/unprivileged_userns_clone ]; then
@@ -59,7 +59,7 @@ case "${ID}" in
 
         # shadow-utils: newuidmap/newgidmap; libgpg-error: snap bundles libgpgme but not this dep
         # iptables-nft: required by netavark for rootful container networking
-        dnf install -y shadow-utils libgpg-error iptables-nft 2>&1 | tail -3
+        dnf install -y shadow-utils libgpg-error iptables-nft man-db 2>&1 | tail -3
 
         # SELinux blocks snap operations
         setenforce 0 2>/dev/null || true
@@ -78,7 +78,7 @@ case "${ID}" in
         dnf install -y epel-release 2>&1 | tail -3
         dnf install -y snapd 2>&1 | tail -5
         # iptables-nft: required by netavark for rootful container networking
-        dnf install -y shadow-utils libgpg-error iptables-nft 2>&1 | tail -3
+        dnf install -y shadow-utils libgpg-error iptables-nft man-db 2>&1 | tail -3
 
         setenforce 0 2>/dev/null || true
         ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true
@@ -139,6 +139,7 @@ test -f /usr/local/bin/podman && echo "  Shim: OK" || { echo "  WARNING: shim mi
 test -L /usr/lib/systemd/system-generators/podman-system-generator && echo "  System generator: OK" || { echo "  WARNING: system generator missing"; HOOK_OK=false; }
 test -f /etc/containers/policy.json && echo "  policy.json: OK" || { echo "  WARNING: policy.json missing"; HOOK_OK=false; }
 test -f /etc/ld.so.conf.d/podman-snap.conf && echo "  ldconfig conf: OK" || { echo "  WARNING: ldconfig conf missing"; HOOK_OK=false; }
+test -L /usr/local/share/man/man1/podman.1 && echo "  Man pages: OK" || echo "  WARNING: man page symlinks missing"
 if [ "${HOOK_OK}" = false ]; then
     echo "  Install hook may have failed — falling back to manual setup"
     printf '%s\n' "${SNAP}/usr/lib/x86_64-linux-gnu" "${SNAP}/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf

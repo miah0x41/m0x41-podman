@@ -331,6 +331,25 @@ tier5() {
         fail "podman.service missing or wrong path"
     fi
 
+    echo "--- man page symlinks installed ---"
+    if [ -L /usr/local/share/man/man1/podman.1 ] && \
+       readlink /usr/local/share/man/man1/podman.1 2>/dev/null | grep -q m0x41-podman; then
+        pass "man page symlinks installed"
+    else
+        fail "man page symlinks missing"
+    fi
+
+    echo "--- man -w podman finds snap man page ---"
+    if command -v man >/dev/null 2>&1; then
+        if man -w podman 2>/dev/null | grep -q podman; then
+            pass "man -w podman finds man page"
+        else
+            fail "man -w podman cannot find man page"
+        fi
+    else
+        pass "man -w podman finds man page (skipped: man not installed)"
+    fi
+
     # --- 5b: Quadlet dry-run ---
     echo ""
     echo "--- 5b: Quadlet dry-run ---"

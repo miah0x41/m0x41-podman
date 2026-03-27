@@ -218,6 +218,19 @@ The snap does not include SELinux policy modules. Tests that require SELinux are
 
 Distros older than ~2021 (e.g. Ubuntu 20.04 with `glibc` 2.31, Debian 10) will not work.
 
+## Man Pages
+
+The snap bundles _Podman_ man pages. The install hook symlinks them into `/usr/local/share/man/` so they are discoverable by `man`:
+
+```bash
+man podman              # main overview
+man podman-run          # command reference
+man podman-build        # command reference
+man containers.conf     # configuration file format (man5)
+```
+
+Command pages (`man1`) and configuration file format pages (`man5`) from the upstream build are included. If `man-db` is installed on the host, `man podman` works immediately after `snap install`. The man pages are removed cleanly on `snap remove`.
+
 ## Install Hook Side Effects
 
 The install hook runs as root on `snap install` and `snap refresh`. It creates the following on the host filesystem:
@@ -230,6 +243,8 @@ The install hook runs as root on `snap install` and `snap refresh`. It creates t
 | `/usr/lib/systemd/user/podman.socket` | Symlink to snap's socket unit |
 | `/usr/lib/systemd/user/podman.service` | Service unit using the shim |
 | `/etc/ld.so.conf.d/podman-snap.conf` | Registers snap libraries with the dynamic linker |
+| `/usr/local/share/man/man1/podman*` | Symlinks to snap's command man pages |
+| `/usr/local/share/man/man5/podman*` | Symlinks to snap's config file format man pages |
 | `/etc/containers/policy.json` | Image signature policy (only if absent) |
 
 **If you already have a native _Podman_ install**, the shim at `/usr/local/bin/podman` will take precedence on PATH (since `/usr/local/bin` is searched before `/usr/bin`). Remove the existing installation first, or use the snap command name `m0x41-podman` to avoid conflicts.
@@ -262,5 +277,6 @@ Any hardcoded revision paths (e.g. from `podman generate systemd` output or manu
 | `podman compose` | Separate install | Separate install |
 | Checkpoint/restore | Supported (with CRIU) | Not supported |
 | Architecture | Multi-arch | `amd64` only |
+| Man pages | Installed system-wide | Symlinked from snap into `/usr/local/share/man/` |
 | Host deps (rootless) | None (all bundled) | `uidmap`, `dbus-user-session` |
 | Host deps (non-Ubuntu) | None | `iptables` |
