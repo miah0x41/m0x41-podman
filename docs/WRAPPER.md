@@ -80,6 +80,10 @@ mkdir -p ~/.local/share/m0x41-podman && echo x1 > ~/.local/share/m0x41-podman/.d
 
 The exact command is printed as part of the warning message. The snap revision (`x1` for `--dangerous` installs) must match the installed snap.
 
+## Quadlet Services at Boot
+
+The wrapper's dependency detection only runs during interactive use (`snap run m0x41-podman`). Quadlet-generated systemd services use the shim at `/usr/local/bin/podman`, which does not perform these checks. If host dependencies are missing when the system boots, all rootless Quadlet services will fail silently — systemd will log the error but no user-facing warning is shown. See [QUADLET.md](QUADLET.md#limitations) for details.
+
 ## Root Behaviour
 
 The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is resolved via the install hook's `ldconfig` registration rather than wrapper-level checks.
