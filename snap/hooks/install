@@ -86,7 +86,24 @@ ExecStart=/usr/local/bin/podman $LOGGING system service
 WantedBy=default.target
 SVCUNIT
 
-# ---------- 6. Reload systemd ----------
+# ---------- 6. Symlink man pages ----------
+# Podman man pages live inside the snap at /usr/share/man/{man1,man5}/.
+# /usr/local/share/man is a MANDATORY_MANPATH on all target distros,
+# so symlinks here make `man podman` work without MANPATH configuration.
+# man1 = command pages; man5 = configuration file format pages.
+for section in man1 man5; do
+    [ -d "${SNAP_CURRENT}/usr/share/man/${section}" ] || continue
+    mkdir -p /usr/local/share/man/${section}
+    for page in "${SNAP_CURRENT}"/usr/share/man/${section}/podman*; do
+        [ -f "${page}" ] || continue
+        ln -sf "${page}" /usr/local/share/man/${section}/
+    done
+done
+if command -v mandb >/dev/null 2>&1; then
+    mandb -q /usr/local/share/man 2>/dev/null || true
+fi
+
+# ---------- 7. Reload systemd ----------
 # Make systemd discover the newly-registered generators.
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true

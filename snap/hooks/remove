@@ -43,7 +43,19 @@ fi
 rm -f /etc/ld.so.conf.d/podman-snap.conf
 ldconfig 2>/dev/null || true
 
-# ---------- 6. Reload systemd ----------
+# ---------- 6. Remove man page symlinks ----------
+# Only remove symlinks that point into our snap.
+for section in man1 man5; do
+    for page in /usr/local/share/man/${section}/podman*; do
+        [ -L "${page}" ] || continue
+        readlink "${page}" 2>/dev/null | grep -q m0x41-podman && rm -f "${page}"
+    done
+done
+if command -v mandb >/dev/null 2>&1; then
+    mandb -q /usr/local/share/man 2>/dev/null || true
+fi
+
+# ---------- 7. Reload systemd ----------
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true
 fi

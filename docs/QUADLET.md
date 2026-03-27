@@ -39,6 +39,7 @@ Both set the same core environment (`PATH`, `LD_LIBRARY_PATH`, `CONTAINERS_CONF`
 | `/usr/lib/systemd/user/podman.socket` | Symlink | Podman API socket unit (user must enable manually) |
 | `/usr/lib/systemd/user/podman.service` | Script | Podman API service using the snap's shim |
 | `/etc/ld.so.conf.d/podman-snap.conf` | Config | Registers snap's bundled libraries with `ldconfig` |
+| `/usr/local/share/man/man{1,5}/podman*` | Symlinks | Man pages for commands (`man1`) and config formats (`man5`) |
 | `/etc/containers/policy.json` | Copy | Image signature policy (only if not already present) |
 
 The remove hook (`snap/hooks/remove`) cleans up all of these except `policy.json` (which may have been customised).
@@ -109,7 +110,8 @@ Running `snap remove m0x41-podman` triggers the remove hook, which:
 3. Removes the generator symlinks (only if they point to this snap)
 4. Removes the Podman API socket and service units (only if they reference this snap)
 5. Removes the `ldconfig` configuration
-6. Runs `systemctl daemon-reload`
+6. Removes man page symlinks (only if they point to this snap)
+7. Runs `systemctl daemon-reload`
 
 The remove hook does **not** delete `/etc/containers/policy.json` (may be user-customised or used by other tools) or any user-created `.container`/`.volume`/`.network` definition files.
 
@@ -131,7 +133,7 @@ Quadlet functionality is tested in tier 5 of the test suite.
 
 | Sub-Tier | Tests | What It Validates |
 |----------|-------|-------------------|
-| 5a | 11 | Install hook artefacts: shim, generators, policy.json, ldconfig, socket units |
+| 5a | 13 | Install hook artefacts: shim, generators, policy.json, ldconfig, socket units, man pages |
 | 5b | 3 | Quadlet dry-run: valid unit generation, correct ExecStart path |
 | 5c | 2 | Live rootful Quadlet: systemd service starts and runs |
 | 5d | 2 | Live rootless Quadlet: systemd user service starts and runs |
@@ -142,16 +144,16 @@ Quadlet functionality is tested in tier 5 of the test suite.
 
 Tested 2026-03-25 on WSL2.
 
-**Single distro (Ubuntu 24.04):** Tier 5 custom tests (5a-5d) 18/18 pass. BATS (5e) 68/73 — 5 failures in `252-quadlet.bats` (snap config conflicts + missing `htpasswd`). `251-system-service` (19/19) and `270-socket-activation` (3/3) pass fully.
+**Single distro (Ubuntu 24.04):** Tier 5 custom tests (5a-5d) 20/20 pass. BATS (5e) 68/73 — 5 failures in `252-quadlet.bats` (snap config conflicts + missing `htpasswd`). `251-system-service` (19/19) and `270-socket-activation` (3/3) pass fully.
 
 **Multi-distro:** Tiers 1-3 + tier 5 custom tests.
 
-| Distro | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (18) |
+| Distro | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (20) |
 |--------|------------|------------|------------|-------------|
-| Ubuntu 22.04 | 7/7 | 8/8 | 6/6 | 18/18 |
-| Ubuntu 24.04 | 7/7 | 8/8 | 6/6 | 18/18 |
-| Debian 12 | 7/7 | 8/8 | 6/6 | 18/18 |
-| CentOS 9 | 7/7 | 8/8 | 6/6 | 17/18 |
-| Fedora 42 | 5/7 | 1/8 | 6/6 | 16/18 |
+| Ubuntu 22.04 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Ubuntu 24.04 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Debian 12 | 7/7 | 8/8 | 6/6 | 20/20 |
+| CentOS 9 | 7/7 | 8/8 | 6/6 | 19/20 |
+| Fedora 42 | 5/7 | 1/8 | 6/6 | 18/20 |
 
 CentOS 9 and Fedora 42 tier 5 failures are rootless Quadlet tests — same underlying `newuidmap` setuid / `dbus-user-session` limitation in LXD containers that affects tier 2. Rootful Quadlet and socket unit installation pass on all distros.

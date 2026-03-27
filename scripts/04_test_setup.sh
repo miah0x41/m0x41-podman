@@ -15,6 +15,7 @@ apt-get update -qq
 apt-get install -y -qq \
     uidmap \
     dbus-user-session \
+    man-db \
     2>&1 | tail -5
 
 echo "=== Phase 2: Install snap (classic) ==="
@@ -40,6 +41,7 @@ test -L /usr/lib/systemd/system-generators/podman-system-generator && echo "  Sy
 test -L /usr/lib/systemd/user-generators/podman-user-generator && echo "  User generator: OK" || { echo "  WARNING: user generator symlink missing"; HOOK_OK=false; }
 test -f /etc/containers/policy.json && echo "  policy.json: OK" || { echo "  WARNING: policy.json missing"; HOOK_OK=false; }
 test -f /etc/ld.so.conf.d/podman-snap.conf && echo "  ldconfig conf: OK" || { echo "  WARNING: ldconfig conf missing"; HOOK_OK=false; }
+test -L /usr/local/share/man/man1/podman.1 && echo "  Man pages: OK" || echo "  WARNING: man page symlinks missing"
 if [ "${HOOK_OK}" = false ]; then
     echo "  Install hook may have failed — falling back to manual setup"
     printf '%s\n' "${SNAP}/usr/lib/x86_64-linux-gnu" "${SNAP}/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/podman-snap.conf

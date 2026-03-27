@@ -41,7 +41,8 @@ description: |
   full test methodology and results.
 
   The install hook places `podman` on PATH at /usr/local/bin/podman.
-  Quadlet (systemd container integration) is supported out of the box.
+  Man pages are included — `man podman`, `man podman-run`, etc. work
+  out of the box. Quadlet (systemd container integration) is supported.
 
 base: core22
 confinement: classic
