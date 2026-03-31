@@ -303,33 +303,69 @@ tier5() {
         fail "policy.json missing"
     fi
 
-    echo "--- ldconfig conf installed ---"
+    echo "--- conmon-wrapper exists and is executable ---"
+    if [ -x "${SNAP}/bin/conmon-wrapper" ]; then
+        pass "conmon-wrapper exists at ${SNAP}/bin/conmon-wrapper"
+    else
+        fail "conmon-wrapper missing or not executable"
+    fi
+
+    echo "--- crun-wrapper exists and is executable ---"
+    if [ -x "${SNAP}/bin/crun-wrapper" ]; then
+        pass "crun-wrapper exists at ${SNAP}/bin/crun-wrapper"
+    else
+        fail "crun-wrapper missing or not executable"
+    fi
+
+    echo "--- no snap library paths in ldconfig cache ---"
+    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+        fail "snap libraries found in ldconfig cache (library path poisoning)"
+    else
+        pass "no snap libraries in ldconfig cache"
+    fi
+
+    echo "--- no podman-snap.conf in ld.so.conf.d ---"
     if [ -f /etc/ld.so.conf.d/podman-snap.conf ]; then
-        pass "ldconfig conf exists"
+        fail "podman-snap.conf still present (should not exist)"
     else
-        fail "ldconfig conf missing"
+        pass "podman-snap.conf absent"
     fi
 
-    echo "--- libyajl in ldconfig cache ---"
-    if ldconfig -p 2>/dev/null | grep -q libyajl; then
-        pass "libyajl registered in ldconfig"
-    else
-        fail "libyajl not in ldconfig cache"
-    fi
+    # Validate each installed unit: must exist, reference the shim, and
+    # not contain any Exec lines pointing to /usr/bin/podman.
+    check_unit_file() {
+        local scope="$1" unit="$2"
+        local path="/usr/lib/systemd/${scope}/${unit}"
+        echo "--- ${scope}: ${unit} references shim ---"
+        if [ ! -f "${path}" ]; then
+            fail "${scope}: ${unit} missing"
+        elif ! grep -q "/usr/local/bin/podman" "${path}" 2>/dev/null; then
+            fail "${scope}: ${unit} does not reference /usr/local/bin/podman"
+        elif grep -q "Exec.*=/usr/bin/podman" "${path}" 2>/dev/null; then
+            fail "${scope}: ${unit} still references /usr/bin/podman"
+        else
+            pass "${scope}: ${unit} references shim"
+        fi
+    }
+    check_unit_symlink() {
+        local scope="$1" unit="$2"
+        local path="/usr/lib/systemd/${scope}/${unit}"
+        echo "--- ${scope}: ${unit} installed ---"
+        if [ -L "${path}" ]; then
+            pass "${scope}: ${unit} symlink exists"
+        else
+            fail "${scope}: ${unit} symlink missing"
+        fi
+    }
 
-    echo "--- podman.socket unit installed ---"
-    if [ -L /usr/lib/systemd/user/podman.socket ]; then
-        pass "podman.socket symlink exists"
-    else
-        fail "podman.socket symlink missing"
-    fi
-
-    echo "--- podman.service unit installed ---"
-    if [ -f /usr/lib/systemd/user/podman.service ] && grep -q "/usr/local/bin/podman" /usr/lib/systemd/user/podman.service 2>/dev/null; then
-        pass "podman.service references shim"
-    else
-        fail "podman.service missing or wrong path"
-    fi
+    for scope in user system; do
+        check_unit_symlink "${scope}" "podman.socket"
+        check_unit_file    "${scope}" "podman.service"
+        check_unit_file    "${scope}" "podman-auto-update.service"
+        check_unit_symlink "${scope}" "podman-auto-update.timer"
+        check_unit_file    "${scope}" "podman-restart.service"
+    done
+    check_unit_file "system" "podman-clean-transient.service"
 
     echo "--- man page symlinks installed ---"
     if [ -L /usr/local/share/man/man1/podman.1 ] && \

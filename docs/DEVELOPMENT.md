@@ -43,7 +43,7 @@ The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as t
 | `netavark` | nil | Downloads pre-built `netavark` and `aardvark-dns` binaries from GitHub Releases |
 | `podman` | nil | Clones _Podman_ v5.8.1, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
 | `configs` | dump | Copies `containers.conf`, `storage.conf`, `registries.conf`, `policy.json` into the snap |
-| `wrapper` | dump | Copies the `podman-wrapper` shell script that sets `PATH` and `LD_LIBRARY_PATH` |
+| `wrapper` | dump | Copies wrapper scripts (`podman-wrapper`, `conmon-wrapper`, `crun-wrapper`) that set `PATH` and `LD_LIBRARY_PATH` |
 
 ### The Wrapper Script
 
@@ -55,7 +55,7 @@ The snap entry point is `bin/podman-wrapper`, not the _Podman_ binary directly. 
 4. Shows a one-time welcome message with alias instructions on first run
 5. Execs the real `podman` binary
 
-Child processes spawned by `conmon` (e.g. `crun`) don't inherit `LD_LIBRARY_PATH`, which is why the test setup also registers the snap's library directory with `ldconfig`.
+Child processes spawned by `conmon` (e.g. `crun`) don't inherit `LD_LIBRARY_PATH`, which is why `containers.conf` points at `conmon-wrapper` and `crun-wrapper` scripts that restore `LD_LIBRARY_PATH` before exec'ing the real binaries.
 
 See [WRAPPER.md](WRAPPER.md) for full details on the wrapper's messages, marker files, and dependency detection logic.
 
@@ -89,8 +89,8 @@ All scripts are in the `scripts/` directory.
 | `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, ~780 tests) with categorised failure classification. Accepts `root` or `rootless` |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
-| `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, registers libraries via `ldconfig`, symlinks man pages, installs `policy.json`. See [QUADLET.md](QUADLET.md) |
-| `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, `ldconfig` config, and man page symlinks; warns about active Quadlet services |
+| `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, installs corrected systemd units, symlinks man pages, installs `policy.json`, detects stale native podman artefacts. See [QUADLET.md](QUADLET.md) |
+| `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, systemd units, and man page symlinks; warns about active Quadlet services |
 
 ## Key Compatibility Issues
 
@@ -110,7 +110,7 @@ _Podman_ v5.8.1 defaults to `pasta` for rootless networking, but `passt` was add
 
 ### `LD_LIBRARY_PATH` Does Not Propagate Through `conmon` → `crun`
 
-The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmon`, which then spawns `crun`, the library path is lost. The snap bundles `libyajl` (required by `crun`), but `crun` can't find it at runtime. Fix: register the snap's library directory system-wide via `ldconfig` during setup.
+The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmon`, which then spawns `crun`, the library path is lost. The snap bundles `libyajl` (required by `crun`), but `crun` can't find it at runtime. Fix: `containers.conf` points at `conmon-wrapper` and `crun-wrapper` scripts that set `LD_LIBRARY_PATH` before exec'ing the real binaries. This scopes library resolution to the snap's own processes without affecting the host.
 
 ### `uidmap` and `dbus-user-session` Required on Host for Rootless
 
@@ -166,7 +166,7 @@ Host (WSL2)                          LXD Build Container          LXD Test Conta
   ├─ creates test container ──────────────────────────────>   04_test_setup.sh
   ├─ pushes .snap + scripts                                    ├─ snap install --classic
   └─ triggers tests                                            ├─ creates test user
-                                                               └─ ldconfig + policy.json
+                                                               └─ policy.json
                                                              05_run_tests.sh [tier1..5|all]
 
 06_test_multi_distro.sh                                      LXD Containers (per distro)

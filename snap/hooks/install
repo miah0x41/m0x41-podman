@@ -1,7 +1,8 @@
 #!/bin/bash
 # snap/hooks/install — Runs as root on snap install and snap refresh.
-# Creates the podman shim, registers systemd generators, configures
-# libraries, and installs policy.json. Must be idempotent.
+# Creates the podman shim, registers systemd generators, installs
+# corrected systemd units, policy.json, and man page symlinks.
+# Detects stale artefacts from native podman. Must be idempotent.
 set -euo pipefail
 
 SNAP_CURRENT="/snap/m0x41-podman/current"
@@ -42,16 +43,7 @@ else
     echo "WARNING: user generator not found in snap — Quadlet may not work" >&2
 fi
 
-# ---------- 3. Register snap libraries with ldconfig ----------
-# Child processes (conmon → crun) don't inherit LD_LIBRARY_PATH from
-# the wrapper or shim. Register the snap's library directory system-wide.
-cat > /etc/ld.so.conf.d/podman-snap.conf <<EOF
-${SNAP_CURRENT}/usr/lib/x86_64-linux-gnu
-${SNAP_CURRENT}/lib/x86_64-linux-gnu
-EOF
-ldconfig
-
-# ---------- 4. Install policy.json ----------
+# ---------- 3. Install policy.json ----------
 # Classic confinement sees the host filesystem. Podman expects policy.json
 # at /etc/containers/policy.json. Don't overwrite if the user has customised it.
 mkdir -p /etc/containers
@@ -59,15 +51,19 @@ if [ ! -f /etc/containers/policy.json ]; then
     cp "${SNAP_CURRENT}/etc/containers/policy.json" /etc/containers/policy.json
 fi
 
-# ---------- 5. Install podman API socket units ----------
-# The snap ships podman.socket and podman.service but the service has
-# /usr/bin/podman hardcoded. Symlink the socket (no path references) and
-# install a corrected service that uses the shim. Users can then enable
-# the socket with: systemctl --user enable --now podman.socket
-mkdir -p /usr/lib/systemd/user
-ln -sf "${SNAP_CURRENT}/usr/lib/systemd/user/podman.socket" \
-    /usr/lib/systemd/user/podman.socket
-cat > /usr/lib/systemd/user/podman.service <<'SVCUNIT'
+# ---------- 4. Install systemd units ----------
+# The snap ships systemd units with /usr/bin/podman hardcoded. Install
+# corrected copies that reference our shim at /usr/local/bin/podman.
+# Sockets and timers are path-agnostic and can be symlinked directly.
+# Units containing ExecStart are rewritten with the correct path.
+for scope in system user; do
+    dir="/usr/lib/systemd/${scope}"
+    mkdir -p "${dir}"
+
+    ln -sf "${SNAP_CURRENT}/usr/lib/systemd/${scope}/podman.socket" \
+        "${dir}/podman.socket"
+
+    cat > "${dir}/podman.service" <<'UNIT'
 [Unit]
 Description=Podman API Service
 Requires=podman.socket
@@ -84,9 +80,65 @@ ExecStart=/usr/local/bin/podman $LOGGING system service
 
 [Install]
 WantedBy=default.target
-SVCUNIT
+UNIT
 
-# ---------- 6. Symlink man pages ----------
+    cat > "${dir}/podman-auto-update.service" <<'UNIT'
+[Unit]
+Description=Podman auto-update service
+Documentation=man:podman-auto-update(1)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/podman auto-update
+ExecStartPost=/usr/local/bin/podman image prune -f
+
+[Install]
+WantedBy=default.target
+UNIT
+
+    ln -sf "${SNAP_CURRENT}/usr/lib/systemd/${scope}/podman-auto-update.timer" \
+        "${dir}/podman-auto-update.timer"
+
+    cat > "${dir}/podman-restart.service" <<'UNIT'
+[Unit]
+Description=Podman Start All Containers With Restart Policy Set To Always
+Documentation=man:podman-start(1)
+StartLimitIntervalSec=0
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+Environment=LOGGING="--log-level=info"
+ExecStart=/usr/local/bin/podman $LOGGING start --all --filter should-start-on-boot=true
+ExecStop=/usr/local/bin/podman $LOGGING stop --all --filter should-start-on-boot=true
+
+[Install]
+WantedBy=default.target
+UNIT
+done
+
+# System-level only: transient data cleanup (requires boot-complete.target).
+cat > /usr/lib/systemd/system/podman-clean-transient.service <<'UNIT'
+[Unit]
+Description=Clean up podman transient data
+RequiresMountsFor=%t/containers
+Documentation=man:podman-system-prune(1)
+Requires=boot-complete.target
+After=local-fs.target boot-complete.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/podman system prune --external
+
+[Install]
+WantedBy=default.target
+UNIT
+
+# ---------- 5. Symlink man pages ----------
 # Podman man pages live inside the snap at /usr/share/man/{man1,man5}/.
 # /usr/local/share/man is a MANDATORY_MANPATH on all target distros,
 # so symlinks here make `man podman` work without MANPATH configuration.
@@ -101,6 +153,63 @@ for section in man1 man5; do
 done
 if command -v mandb >/dev/null 2>&1; then
     mandb -q /usr/local/share/man 2>/dev/null || true
+fi
+
+# ---------- 6. Detect stale artefacts from native podman ----------
+# If the host previously had a native podman package (apt/dnf) that was
+# removed but not purged, enablement symlinks and config files may remain.
+# These can cause conflicts or confusion. Warn and offer cleanup guidance.
+STALE_FOUND=false
+
+# 6a. Stale enablement symlinks from a previous native podman package.
+# After section 4, our corrected units exist at /usr/lib/systemd/system/.
+# Any zombie enablement symlinks now resolve to our units, which is fine.
+# Warn only about symlinks that still dangle (pointing to paths we don't
+# provide, e.g. podman-kube@.service).
+for wants_dir in /etc/systemd/system/default.target.wants \
+                 /etc/systemd/system/sockets.target.wants \
+                 /etc/systemd/system/timers.target.wants; do
+    for link in "${wants_dir}"/podman*; do
+        [ -L "${link}" ] || continue
+        target=$(readlink "${link}" 2>/dev/null)
+        echo "${target}" | grep -q m0x41-podman && continue
+        [ -f "${target}" ] && continue
+        if [ "${STALE_FOUND}" = false ]; then
+            echo "" >&2
+            echo "WARNING: Stale artefacts detected from a previous native podman installation." >&2
+            echo "  These may cause systemd warnings at boot." >&2
+            STALE_FOUND=true
+        fi
+        echo "  - dangling symlink: ${link} -> ${target}" >&2
+    done
+done
+
+# 6b. Stale ldconfig config from a previous snap revision.
+for f in /etc/ld.so.conf.d/podman-snap.conf /etc/ld.so.conf.d/podman-snap.conf.disabled; do
+    if [ -f "${f}" ]; then
+        if [ "${STALE_FOUND}" = false ]; then
+            echo "" >&2
+            echo "WARNING: Stale artefacts detected from a previous installation." >&2
+            STALE_FOUND=true
+        fi
+        echo "  - stale file: ${f}" >&2
+    fi
+done
+
+if [ "${STALE_FOUND}" = true ]; then
+    echo "" >&2
+    echo "  To clean up (recommended):" >&2
+    if command -v apt >/dev/null 2>&1; then
+        echo "    sudo apt purge podman 2>/dev/null" >&2
+    elif command -v dnf >/dev/null 2>&1; then
+        echo "    sudo dnf remove podman 2>/dev/null" >&2
+    fi
+    echo "    sudo rm -f /etc/ld.so.conf.d/podman-snap.conf*" >&2
+    echo "  Or selectively:" >&2
+    echo "    sudo rm -f /etc/ld.so.conf.d/podman-snap.conf*" >&2
+    echo "    sudo systemctl disable podman.service podman.socket podman-auto-update.timer \\" >&2
+    echo "      podman-auto-update.service podman-restart.service podman-clean-transient.service" >&2
+    echo "" >&2
 fi
 
 # ---------- 7. Reload systemd ----------

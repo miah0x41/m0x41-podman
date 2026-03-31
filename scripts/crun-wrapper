@@ -1,0 +1,9 @@
+#!/bin/bash
+# crun-wrapper — LD_LIBRARY_PATH bridge for crun
+# crun is spawned by conmon as a child process and does not inherit
+# the parent's LD_LIBRARY_PATH. Without this, crun cannot find
+# libyajl.so.2 and other snap-bundled libraries.
+SNAP=/snap/m0x41-podman/current
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:/usr/bin:$PATH"
+exec "$SNAP/usr/bin/crun" "$@"

@@ -45,7 +45,7 @@ _Podman_ hardcodes two filesystem paths for `policy.json` and provides no enviro
 
 ### 6. Install hook cannot modify the host
 
-Classic confinement enables the snap's install hook to register `systemd` generators for _Quadlet_ (`systemd` container integration) and place a `podman` shim on PATH at `/usr/local/bin/podman`. These operations write to `/usr/lib/systemd/`, `/usr/local/bin/`, and `/etc/ld.so.conf.d/` — all prohibited under strict confinement. Without them, _Quadlet_ does not work and users must invoke the snap by its full name rather than `podman`.
+Classic confinement enables the snap's install hook to register `systemd` generators for _Quadlet_ (`systemd` container integration) and place a `podman` shim on PATH at `/usr/local/bin/podman`. These operations write to `/usr/lib/systemd/` and `/usr/local/bin/` — both prohibited under strict confinement. Without them, _Quadlet_ does not work and users must invoke the snap by its full name rather than `podman`.
 
 One of the key changes to v5 of _Podman_ is the ability to orchestrate pods using _Quadlets_ relative to v4 (currently in Ubuntu 24.04).
 
@@ -67,7 +67,7 @@ One of the key changes to v5 of _Podman_ is the ability to orchestrate pods usin
 
 The snap takes care to minimise its host footprint and clean up after itself:
 
-- **Install hook is idempotent** — safe to run on install and refresh. Creates a `/usr/local/bin/podman` shim (marked with an identifying comment), symlinks systemd generators, registers bundled libraries via `ldconfig`, and copies `policy.json` only if not already present.
-- **Remove hook cleans up** — removes the shim (only if it contains the snap's marker comment), removes generator symlinks (only if they point to this snap), removes the `ldconfig` configuration, and reloads systemd. Does not remove `policy.json` (may be user-customised or used by other tools).
+- **Install hook is idempotent** — safe to run on install and refresh. Creates a `/usr/local/bin/podman` shim (marked with an identifying comment), symlinks systemd generators, installs corrected systemd units (auto-update, restart, API socket/service), symlinks man pages, and copies `policy.json` only if not already present. Detects stale artefacts from a previous native podman installation and warns the user.
+- **Remove hook cleans up** — removes the shim (only if it contains the snap's marker comment), removes generator symlinks (only if they point to this snap), removes all installed systemd units (only if they reference the shim), removes man page symlinks, and reloads systemd. Does not remove `policy.json` (may be user-customised or used by other tools).
 - **No background daemon** — _Podman_ is daemonless. The snap runs only when the user invokes it.
 - **Cross-distro tested** — validated across Ubuntu 22.04, Ubuntu 24.04, Debian 12, CentOS 9 Stream, and Fedora 42 in both rootless and rootful modes with a 5-tier automated test suite.

@@ -36,9 +36,12 @@ Both set the same core environment (`PATH`, `LD_LIBRARY_PATH`, `CONTAINERS_CONF`
 | `/usr/local/bin/podman` | Script | Shim that sets snap environment and execs `podman` |
 | `/usr/lib/systemd/system-generators/podman-system-generator` | Symlink | Rootful Quadlet generator |
 | `/usr/lib/systemd/user-generators/podman-user-generator` | Symlink | Rootless Quadlet generator |
-| `/usr/lib/systemd/user/podman.socket` | Symlink | Podman API socket unit (user must enable manually) |
-| `/usr/lib/systemd/user/podman.service` | Script | Podman API service using the snap's shim |
-| `/etc/ld.so.conf.d/podman-snap.conf` | Config | Registers snap's bundled libraries with `ldconfig` |
+| `/usr/lib/systemd/{system,user}/podman.socket` | Symlink | Podman API socket unit |
+| `/usr/lib/systemd/{system,user}/podman.service` | Script | Podman API service using the shim |
+| `/usr/lib/systemd/{system,user}/podman-auto-update.service` | Script | Auto-update service using the shim |
+| `/usr/lib/systemd/{system,user}/podman-auto-update.timer` | Symlink | Daily auto-update timer |
+| `/usr/lib/systemd/{system,user}/podman-restart.service` | Script | Restart-policy service using the shim |
+| `/usr/lib/systemd/system/podman-clean-transient.service` | Script | Transient data cleanup using the shim |
 | `/usr/local/share/man/man{1,5}/podman*` | Symlinks | Man pages for commands (`man1`) and config formats (`man5`) |
 | `/etc/containers/policy.json` | Copy | Image signature policy (only if not already present) |
 
@@ -108,10 +111,9 @@ Running `snap remove m0x41-podman` triggers the remove hook, which:
 1. Warns if active Quadlet-generated services are detected
 2. Removes the `/usr/local/bin/podman` shim (only if it contains the snap's marker comment)
 3. Removes the generator symlinks (only if they point to this snap)
-4. Removes the Podman API socket and service units (only if they reference this snap)
-5. Removes the `ldconfig` configuration
-6. Removes man page symlinks (only if they point to this snap)
-7. Runs `systemctl daemon-reload`
+4. Removes all systemd units (only if they reference this snap's shim or symlink to it)
+5. Removes man page symlinks (only if they point to this snap)
+6. Runs `systemctl daemon-reload`
 
 The remove hook does **not** delete `/etc/containers/policy.json` (may be user-customised or used by other tools) or any user-created `.container`/`.volume`/`.network` definition files.
 
@@ -133,7 +135,7 @@ Quadlet functionality is tested in tier 5 of the test suite.
 
 | Sub-Tier | Tests | What It Validates |
 |----------|-------|-------------------|
-| 5a | 13 | Install hook artefacts: shim, generators, policy.json, ldconfig, socket units, man pages |
+| 5a | 24 | Install hook artefacts: shim, generators, policy.json, wrappers, no-ldconfig-poisoning, systemd units (system + user), man pages |
 | 5b | 3 | Quadlet dry-run: valid unit generation, correct ExecStart path |
 | 5c | 2 | Live rootful Quadlet: systemd service starts and runs |
 | 5d | 2 | Live rootless Quadlet: systemd user service starts and runs |
