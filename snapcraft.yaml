@@ -18,7 +18,7 @@ description: |
   default on Ubuntu Desktop, but not on server or minimal installs).
   Non-Ubuntu distros (Debian, CentOS, Fedora) also require `iptables` for
   rootful networking. The snap's install hook
-  automatically configures library paths, systemd generators for Quadlet,
+  automatically configures systemd generators for Quadlet
   and places `podman` on PATH at `/usr/local/bin/podman`.
 
   Rootless networking uses `slirp4netns` rather than `pasta`, which is the
@@ -154,6 +154,10 @@ parts:
       if [ -d docs/build/man ]; then
         make install.man PREFIX=/usr DESTDIR=$CRAFT_PART_INSTALL || true
       fi
+    prime:
+      - -usr/lib/systemd/user/gpg-agent*
+      - -usr/lib/systemd/user/dirmngr*
+      - -usr/share/doc/gnupg/examples/systemd-user
 
   configs:
     plugin: dump
@@ -169,3 +173,5 @@ parts:
     source: scripts/
     organize:
       podman-wrapper: bin/podman-wrapper
+      conmon-wrapper: bin/conmon-wrapper
+      crun-wrapper: bin/crun-wrapper

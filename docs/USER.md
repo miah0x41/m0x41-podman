@@ -240,23 +240,83 @@ The install hook runs as root on `snap install` and `snap refresh`. It creates t
 | `/usr/local/bin/podman` | Shim script (entry point for systemd and PATH) |
 | `/usr/lib/systemd/system-generators/podman-system-generator` | Symlink to snap's Quadlet generator (rootful) |
 | `/usr/lib/systemd/user-generators/podman-user-generator` | Symlink to snap's Quadlet generator (rootless) |
-| `/usr/lib/systemd/user/podman.socket` | Symlink to snap's socket unit |
-| `/usr/lib/systemd/user/podman.service` | Service unit using the shim |
-| `/etc/ld.so.conf.d/podman-snap.conf` | Registers snap libraries with the dynamic linker |
+| `/usr/lib/systemd/system/podman.socket` | Symlink to snap's socket unit (rootful) |
+| `/usr/lib/systemd/system/podman.service` | API service using the shim (rootful) |
+| `/usr/lib/systemd/system/podman-auto-update.service` | Auto-update service using the shim |
+| `/usr/lib/systemd/system/podman-auto-update.timer` | Symlink to snap's daily timer |
+| `/usr/lib/systemd/system/podman-restart.service` | Restart-policy service using the shim |
+| `/usr/lib/systemd/system/podman-clean-transient.service` | Transient data cleanup using the shim |
+| `/usr/lib/systemd/user/podman.socket` | Symlink to snap's socket unit (rootless) |
+| `/usr/lib/systemd/user/podman.service` | API service using the shim (rootless) |
+| `/usr/lib/systemd/user/podman-auto-update.service` | Auto-update service using the shim (rootless) |
+| `/usr/lib/systemd/user/podman-auto-update.timer` | Symlink to snap's daily timer (rootless) |
+| `/usr/lib/systemd/user/podman-restart.service` | Restart-policy service using the shim (rootless) |
 | `/usr/local/share/man/man1/podman*` | Symlinks to snap's command man pages |
 | `/usr/local/share/man/man5/podman*` | Symlinks to snap's config file format man pages |
 | `/etc/containers/policy.json` | Image signature policy (only if absent) |
 
-**If you already have a native _Podman_ install**, the shim at `/usr/local/bin/podman` will take precedence on PATH (since `/usr/local/bin` is searched before `/usr/bin`). Remove the existing installation first, or use the snap command name `m0x41-podman` to avoid conflicts.
-
 All hook-created files are removed by the remove hook (`snap remove`) using marker-based ownership checks. The remove hook preserves `/etc/containers/policy.json` since it may be used by other tools.
+
+## Replacing a Native _Podman_ Install
+
+If you are replacing a distribution-packaged _Podman_ (e.g. `apt install podman`) with this snap, **purge the native package first**. A simple `apt remove` leaves configuration files, systemd enablement symlinks, and `ld.so.conf.d` entries behind. These artefacts cause conflicts:
+
+- **Enablement symlinks** at `/etc/systemd/system/*.target.wants/podman*` point to unit files that no longer exist after removal. systemd logs warnings for each dangling symlink at every boot and `daemon-reload`.
+- **`/etc/containers/`** retains `libpod.conf`, `registries.conf`, and `policy.json` from the native package. These are harmless (the snap uses its own config via environment variables) but clutter the filesystem.
+- **`/etc/ld.so.conf.d/podman-snap.conf`** may exist from a previous snap revision that registered snap library paths system-wide. This is no longer needed and should be deleted.
+
+### Recommended: Purge Before Installing the Snap
+
+```bash
+# Stop any running podman services
+sudo systemctl stop podman.socket podman.service 2>/dev/null
+systemctl --user stop podman.socket podman.service 2>/dev/null
+
+# Purge the native package (removes binaries AND config files)
+sudo apt purge podman 2>/dev/null
+# Or on Fedora/CentOS:
+# sudo dnf remove podman
+
+# Clean up any stale ldconfig entries
+sudo rm -f /etc/ld.so.conf.d/podman-snap.conf*
+sudo ldconfig
+
+# Install the snap
+sudo snap install m0x41-podman --dangerous --classic
+```
+
+### Alternative: Selective Cleanup
+
+If you cannot purge (e.g. other packages depend on `podman`), disable the stale systemd units manually:
+
+```bash
+# Disable stale system-level units
+sudo systemctl disable podman.service podman.socket \
+    podman-auto-update.service podman-auto-update.timer \
+    podman-restart.service podman-clean-transient.service 2>/dev/null
+
+# Remove stale ldconfig entries
+sudo rm -f /etc/ld.so.conf.d/podman-snap.conf*
+sudo ldconfig
+```
+
+The snap's install hook detects stale artefacts and prints a warning with cleanup instructions if any are found.
+
+### What the Snap Does Not Touch
+
+The snap does not remove or modify files from the native package. Specifically:
+
+- `/etc/containers/libpod.conf` — stale config from native podman v4.x; harmless
+- `/etc/containers/registries.conf` — the snap uses its own copy via `CONTAINERS_REGISTRIES_CONF`
+- `/etc/containers/policy.json` — the snap only writes this if absent
+- Container storage at `/var/lib/containers/` — rootful containers from the native install remain accessible
 
 ## Snap Refresh Behaviour
 
 When `snap refresh` runs:
 
 1. The `current` symlink is updated to the new revision
-2. The install hook re-runs, updating the shim, generator symlinks, and ldconfig entries
+2. The install hook re-runs, updating the shim, generator symlinks, and man page symlinks
 3. The wrapper's dependency marker (`.deps-ok`) is invalidated, triggering a one-time re-check
 4. Running containers are **not** migrated or restarted
 

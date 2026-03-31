@@ -46,8 +46,10 @@ lxc exec "${CONTAINER_NAME}" -- sed -i "s/^version: .*/version: \"${SNAP_VERSION
 for f in containers.conf storage.conf registries.conf policy.json; do
     lxc file push "${PROJECT_DIR}/snap/${f}" "${CONTAINER_NAME}/root/snap-build/snap/${f}"
 done
-lxc file push "${PROJECT_DIR}/scripts/podman-wrapper" "${CONTAINER_NAME}/root/snap-build/scripts/podman-wrapper"
-lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/scripts/podman-wrapper
+for wrapper in podman-wrapper conmon-wrapper crun-wrapper; do
+    lxc file push "${PROJECT_DIR}/scripts/${wrapper}" "${CONTAINER_NAME}/root/snap-build/scripts/${wrapper}"
+done
+lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/scripts/podman-wrapper /root/snap-build/scripts/conmon-wrapper /root/snap-build/scripts/crun-wrapper
 
 lxc exec "${CONTAINER_NAME}" -- mkdir -p /root/snap-build/snap/hooks
 for f in install remove; do

@@ -1,0 +1,8 @@
+#!/bin/bash
+# conmon-wrapper — LD_LIBRARY_PATH bridge for conmon
+# conmon is spawned by podman as a child process and does not inherit
+# the parent's LD_LIBRARY_PATH. This wrapper restores it before exec.
+SNAP=/snap/m0x41-podman/current
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
+exec "$SNAP/usr/bin/conmon" "$@"

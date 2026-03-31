@@ -72,7 +72,7 @@ There is no override mechanism for `storage.conf` or `registries.conf`. See [doc
 
 **Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` hardcodes snap revision paths that break on refresh — use Quadlet instead.
 
-**The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, and configures library paths via `ldconfig`. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list.
+**The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, installs corrected systemd units, and symlinks man pages. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list. If a previous native _Podman_ installation is detected, the hook warns about stale artefacts and suggests cleanup — see [Replacing a Native Podman Install](docs/USER.md#replacing-a-native-podman-install).
 
 **Architecture is `amd64` only** with a `glibc` >= 2.34 floor. Distros older than ~2021 are not supported.
 
@@ -150,7 +150,6 @@ The snap bundles _Podman_ and all its runtime dependencies so that no additional
 The snap's install hook automatically:
 - Creates `/usr/local/bin/podman` (so `podman` is on PATH without aliasing)
 - Registers systemd generators (so Quadlet works immediately)
-- Configures bundled library paths via `ldconfig`
 - Installs `policy.json` at `/etc/containers/policy.json`
 
 See [docs/COMPONENTS.md](docs/COMPONENTS.md) for full details including licenses and upstream links.
@@ -188,7 +187,7 @@ Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host'
 ```
 snapcraft.yaml                  # Snap definition (core22, classic confinement)
 snap/                           # Bundled container engine configuration
-  hooks/install                 # Install hook (shim, generators, ldconfig, policy.json)
+  hooks/install                 # Install hook (shim, generators, man pages, policy.json)
   hooks/remove                  # Remove hook (cleanup)
 scripts/                        # Build, test, and multi-distro automation
 docs/

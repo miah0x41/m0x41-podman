@@ -232,7 +232,7 @@ fi
 # su - does not create a logind session, so dbus-send --session always fails.
 # This is a container environment limitation, not a wrapper bug.
 # We only check that the binary deps (uidmap) were resolved.
-# libgpg-error is no longer checked by the wrapper — handled by install hook ldconfig.
+# libgpg-error is no longer checked by the wrapper — handled by conmon/crun wrappers.
 
 echo "--- deps installed: marker behaviour ---"
 # If all deps are satisfied (no WARNING at all), the marker should be created.

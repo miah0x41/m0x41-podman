@@ -1,12 +1,12 @@
 # Wrapper Script
 
-The snap entry point is `bin/podman-wrapper`, not the _Podman_ binary directly. The wrapper performs three functions: environment setup, first-run guidance, and dependency detection. This document covers the wrapper's behaviour, the messages users will see, and how the dependency detection is tested.
+The snap entry point is `bin/podman-wrapper`, not the _Podman_ binary directly. The wrapper performs three functions: environment setup, first-run guidance, and dependency detection. Two additional wrappers (`bin/conmon-wrapper` and `bin/crun-wrapper`) provide `LD_LIBRARY_PATH` for child processes. This document covers the wrapper's behaviour, the messages users will see, and how the dependency detection is tested.
 
 ## What the Wrapper Does
 
 ### 1. Environment Setup
 
-The wrapper prepends the snap's binary and library directories to `PATH` and `LD_LIBRARY_PATH` so that _Podman_ and its child processes can find bundled components (`netavark`, `aardvark-dns`, `conmon`, `crun`, `libyajl`, `libgpgme`, etc.). It then exec's the real `podman` binary.
+The wrapper prepends the snap's binary and library directories to `PATH` and `LD_LIBRARY_PATH` so that _Podman_ can find bundled components and libraries. It then exec's the real `podman` binary. Child processes (`conmon`, `crun`) do not inherit `LD_LIBRARY_PATH` from the parent, so `containers.conf` points them at dedicated wrappers (`bin/conmon-wrapper`, `bin/crun-wrapper`) that restore it.
 
 ### 2. First-Run Hello Message
 
@@ -46,7 +46,7 @@ The checks are:
 | `command -v newgidmap` | `uidmap` package missing | Same as above |
 | `dbus-send --session` | `dbus-user-session` missing or no session bus | Requires a running system service |
 
-Note: `libgpg-error` was previously checked here but was removed because the install hook's `ldconfig` registration makes host-installed libraries discoverable by child processes (`conmon` → `crun`). The library itself must still exist on the host — on Debian/Ubuntu it is typically already present; on Fedora/CentOS it may need explicit installation (`dnf install libgpg-error`).
+Note: `libgpg-error` was previously checked here but was removed because the `conmon-wrapper` and `crun-wrapper` scripts set `LD_LIBRARY_PATH` to include the snap's library directories, making bundled libraries discoverable by child processes. The library itself must still exist on the host — on Debian/Ubuntu it is typically already present; on Fedora/CentOS it may need explicit installation (`dnf install libgpg-error`).
 
 The install command adapts to the distro:
 
@@ -86,7 +86,7 @@ The wrapper's dependency detection only runs during interactive use (`snap run m
 
 ## Root Behaviour
 
-The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is resolved via the install hook's `ldconfig` registration rather than wrapper-level checks.
+The entire first-run and dependency check block is skipped when running as root (`uid 0`). _Rootful_ _Podman_ does not need `uidmap` or `dbus-user-session`, and `libgpg-error` is resolved via the `conmon-wrapper` and `crun-wrapper` `LD_LIBRARY_PATH` settings rather than wrapper-level checks.
 
 ## Testing
 
@@ -140,7 +140,7 @@ Tested 2026-03-24 on WSL2. All distros pass 18/18.
 
 - **D-Bus session bus**: `dbus-send --session` always fails inside LXD containers when using `su -` because no logind session exists. The wrapper correctly detects this as a missing dependency. The phase 5 tests tolerate `dbus-user-session` remaining flagged in container environments — this is a test infrastructure limitation, not a wrapper bug.
 - **`snap run` stderr**: On Ubuntu, `snap run` intercepts the wrapper's stderr output, making it invisible to the calling process. The tests invoke the wrapper binary directly with `SNAP`, `SNAP_VERSION`, and `SNAP_REVISION` environment variables set to bypass this. The wrapper logic is identical in both paths.
-- **`ldconfig` PATH**: On Debian, `/usr/sbin` is not in non-root users' default PATH. The install hook registers the snap's library directory via `ldconfig` during installation, so the wrapper does not need to check library availability at runtime.
+- **`ldconfig` PATH**: On Debian, `/usr/sbin` is not in non-root users' default PATH. The `conmon-wrapper` and `crun-wrapper` scripts set `LD_LIBRARY_PATH` directly, so the wrapper does not need to check library availability at runtime.
 
 ### Container Naming
 

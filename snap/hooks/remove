@@ -27,23 +27,31 @@ if [ -L /usr/lib/systemd/user-generators/podman-user-generator ] && \
     rm -f /usr/lib/systemd/user-generators/podman-user-generator
 fi
 
-# ---------- 4. Remove podman API socket units ----------
-# Only remove the socket symlink if it points to our snap.
-if [ -L /usr/lib/systemd/user/podman.socket ] && \
-   readlink /usr/lib/systemd/user/podman.socket 2>/dev/null | grep -q m0x41-podman; then
-    rm -f /usr/lib/systemd/user/podman.socket
-fi
-# Only remove the service if it references our shim.
-if [ -f /usr/lib/systemd/user/podman.service ] && \
-   grep -q "/usr/local/bin/podman" /usr/lib/systemd/user/podman.service 2>/dev/null; then
-    rm -f /usr/lib/systemd/user/podman.service
+# ---------- 4. Remove systemd units ----------
+# Only remove units that reference our shim or point to our snap.
+for unit in podman.service podman-auto-update.service podman-restart.service; do
+    for scope in /usr/lib/systemd/system /usr/lib/systemd/user; do
+        if [ -f "${scope}/${unit}" ] && \
+           grep -q "/usr/local/bin/podman" "${scope}/${unit}" 2>/dev/null; then
+            rm -f "${scope}/${unit}"
+        fi
+    done
+done
+for unit in podman.socket podman-auto-update.timer; do
+    for scope in /usr/lib/systemd/system /usr/lib/systemd/user; do
+        if [ -L "${scope}/${unit}" ] && \
+           readlink "${scope}/${unit}" 2>/dev/null | grep -q m0x41-podman; then
+            rm -f "${scope}/${unit}"
+        fi
+    done
+done
+# podman-clean-transient is system-level only.
+if [ -f /usr/lib/systemd/system/podman-clean-transient.service ] && \
+   grep -q "/usr/local/bin/podman" /usr/lib/systemd/system/podman-clean-transient.service 2>/dev/null; then
+    rm -f /usr/lib/systemd/system/podman-clean-transient.service
 fi
 
-# ---------- 5. Remove ldconfig config ----------
-rm -f /etc/ld.so.conf.d/podman-snap.conf
-ldconfig 2>/dev/null || true
-
-# ---------- 6. Remove man page symlinks ----------
+# ---------- 5. Remove man page symlinks ----------
 # Only remove symlinks that point into our snap.
 for section in man1 man5; do
     for page in /usr/local/share/man/${section}/podman*; do
@@ -55,7 +63,7 @@ if command -v mandb >/dev/null 2>&1; then
     mandb -q /usr/local/share/man 2>/dev/null || true
 fi
 
-# ---------- 7. Reload systemd ----------
+# ---------- 6. Reload systemd ----------
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true
 fi
