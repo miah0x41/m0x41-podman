@@ -31,10 +31,18 @@ fi
 
 echo "Container IP: $(lxc list "${CONTAINER_NAME}" -f csv -c 4 | cut -d' ' -f1)"
 
-echo "=== Step 2: Push snap project files ==="
+echo "=== Step 2: Compute build version ==="
+BASE_VERSION=$(grep '^version:' "${PROJECT_DIR}/snapcraft.yaml" | sed 's/version: *"\?\([^"]*\)"\?/\1/')
+BUILD_DATE=$(date -u +%Y%m%d)
+GIT_SHORT=$(git -C "${PROJECT_DIR}" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+SNAP_VERSION="${BASE_VERSION}+${BUILD_DATE}.g${GIT_SHORT}"
+echo "Build version: ${SNAP_VERSION}"
+
+echo "=== Step 3: Push snap project files ==="
 lxc exec "${CONTAINER_NAME}" -- mkdir -p /root/snap-build/snap /root/snap-build/scripts
 
 lxc file push "${PROJECT_DIR}/snapcraft.yaml" "${CONTAINER_NAME}/root/snap-build/snapcraft.yaml"
+lxc exec "${CONTAINER_NAME}" -- sed -i "s/^version: .*/version: \"${SNAP_VERSION}\"/" /root/snap-build/snapcraft.yaml
 for f in containers.conf storage.conf registries.conf policy.json; do
     lxc file push "${PROJECT_DIR}/snap/${f}" "${CONTAINER_NAME}/root/snap-build/snap/${f}"
 done
@@ -50,10 +58,10 @@ lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/snap/hooks/install /ro
 lxc file push "${SCRIPT_DIR}/02_build_snap.sh" "${CONTAINER_NAME}/root/02_build_snap.sh"
 lxc exec "${CONTAINER_NAME}" -- chmod +x /root/02_build_snap.sh
 
-echo "=== Step 3: Build snap ==="
+echo "=== Step 4: Build snap ==="
 lxc exec "${CONTAINER_NAME}" -- /root/02_build_snap.sh
 
-echo "=== Step 4: Pull built snap ==="
+echo "=== Step 5: Pull built snap ==="
 SNAP_FILE=$(lxc exec "${CONTAINER_NAME}" -- find /root/snap-build -maxdepth 1 -name "*.snap" -type f | head -1)
 if [ -n "${SNAP_FILE}" ]; then
     lxc file pull "${CONTAINER_NAME}${SNAP_FILE}" "${PROJECT_DIR}/"
