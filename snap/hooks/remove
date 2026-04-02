@@ -16,7 +16,7 @@ if [ -f /usr/local/bin/podman ] && grep -q "m0x41-podman shim" /usr/local/bin/po
     rm -f /usr/local/bin/podman
 fi
 
-# ---------- 3. Remove generator symlinks ----------
+# ---------- 3. Remove generator and quadlet symlinks ----------
 # Only remove if they point to our snap.
 if [ -L /usr/lib/systemd/system-generators/podman-system-generator ] && \
    readlink /usr/lib/systemd/system-generators/podman-system-generator 2>/dev/null | grep -q m0x41-podman; then
@@ -25,6 +25,11 @@ fi
 if [ -L /usr/lib/systemd/user-generators/podman-user-generator ] && \
    readlink /usr/lib/systemd/user-generators/podman-user-generator 2>/dev/null | grep -q m0x41-podman; then
     rm -f /usr/lib/systemd/user-generators/podman-user-generator
+fi
+if [ -L /usr/libexec/podman/quadlet ] && \
+   readlink /usr/libexec/podman/quadlet 2>/dev/null | grep -q m0x41-podman; then
+    rm -f /usr/libexec/podman/quadlet
+    rmdir /usr/libexec/podman 2>/dev/null || true
 fi
 
 # ---------- 4. Remove systemd units ----------

@@ -317,6 +317,14 @@ tier5() {
         fail "crun-wrapper missing or not executable"
     fi
 
+    echo "--- quadlet symlink at standard path ---"
+    if [ -L /usr/libexec/podman/quadlet ] && \
+       readlink /usr/libexec/podman/quadlet 2>/dev/null | grep -q m0x41-podman; then
+        pass "quadlet symlink exists at /usr/libexec/podman/quadlet"
+    else
+        fail "quadlet symlink missing at /usr/libexec/podman/quadlet"
+    fi
+
     echo "--- no snap library paths in ldconfig cache ---"
     if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
         fail "snap libraries found in ldconfig cache (library path poisoning)"
@@ -762,6 +770,13 @@ tier6_removal() {
         fail "user generator symlink still present"
     else
         pass "user generator symlink removed"
+    fi
+
+    echo "--- quadlet symlink removed ---"
+    if [ -L /usr/libexec/podman/quadlet ]; then
+        fail "quadlet symlink still present"
+    else
+        pass "quadlet symlink removed"
     fi
 
     echo "--- systemd units removed ---"

@@ -25,7 +25,7 @@ exec "$SNAP/usr/bin/podman" "$@"
 SHIM
 chmod +x /usr/local/bin/podman
 
-# ---------- 2. Symlink systemd generators ----------
+# ---------- 2. Symlink systemd generators and quadlet ----------
 # Quadlet operates as a systemd generator. systemd discovers generators
 # in /usr/lib/systemd/{system,user}-generators/ — the snap's copies
 # are invisible to systemd without these symlinks.
@@ -41,6 +41,13 @@ if [ -f "${SNAP_CURRENT}/usr/lib/systemd/user-generators/podman-user-generator" 
         /usr/lib/systemd/user-generators/podman-user-generator
 else
     echo "WARNING: user generator not found in snap — Quadlet may not work" >&2
+fi
+
+# Quadlet binary at the standard path. Tools and scripts expect
+# /usr/libexec/podman/quadlet — same pattern as the generators above.
+if [ -f "${SNAP_CURRENT}/usr/libexec/podman/quadlet" ]; then
+    mkdir -p /usr/libexec/podman
+    ln -sf "${SNAP_CURRENT}/usr/libexec/podman/quadlet" /usr/libexec/podman/quadlet
 fi
 
 # ---------- 3. Install policy.json ----------

@@ -16,11 +16,18 @@ apt-get install -y -qq \
     uidmap \
     dbus-user-session \
     man-db \
+    make \
+    gcc \
+    pkg-config \
+    libgpgme-dev \
+    libseccomp-dev \
+    libbtrfs-dev \
     2>&1 | tail -5
 
 echo "=== Phase 2: Install snap (classic) ==="
 snap wait system seed.loaded 2>/dev/null || true
 snap install "${SNAP_FILE}" --dangerous --classic
+export PATH="/snap/bin:$PATH"
 echo "Installed: $(m0x41-podman --version)"
 
 echo "=== Phase 3: Create test user ==="
@@ -86,7 +93,15 @@ apt-get install -y -qq \
     socat \
     openssl \
     apache2-utils \
+    buildah \
     2>&1 | tail -3
+
+# Build podman-testing helper binary (used by 331-system-check.bats)
+if [ ! -f "${PODMAN_SRC}/bin/podman-testing" ] && [ -d "${PODMAN_SRC}/cmd/podman-testing" ]; then
+    echo "Building podman-testing helper..."
+    cd "${PODMAN_SRC}" && make podman-testing 2>&1 | tail -5 || echo "WARNING: podman-testing build failed (331-system-check.bats will skip)"
+    cd /root
+fi
 
 # Disable AppArmor userns restriction if present (Ubuntu 24.04+).
 # Both set it now and persist it so VM reboots retain the setting.
