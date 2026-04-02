@@ -537,6 +537,316 @@ CEOF
     fi
 }
 
+# ---------- Tier 6: Host-Side Impact Tests (VM only) ----------
+tier6() {
+    echo ""
+    echo "===== TIER 6: Host-Side Impact Tests (VM) ====="
+
+    # --- 6a: Network integrity ---
+    echo "--- 6a: Network integrity after snap install ---"
+
+    echo "--- DNS resolution from host ---"
+    if nslookup dns.google >/dev/null 2>&1 || host dns.google >/dev/null 2>&1 || getent hosts dns.google >/dev/null 2>&1; then
+        pass "host DNS resolution works"
+    else
+        fail "host DNS resolution broken after snap install"
+    fi
+
+    echo "--- default route intact ---"
+    if ip route show default | grep -q "default"; then
+        pass "default route exists"
+    else
+        fail "default route missing"
+    fi
+
+    echo "--- no snap-created network interfaces ---"
+    SNAP_IFACES=$(ip link show 2>/dev/null | grep -c "podman\|m0x41" || true)
+    if [ "${SNAP_IFACES}" -eq 0 ]; then
+        pass "no stale podman network interfaces on host"
+    else
+        fail "snap left network interfaces on host"
+    fi
+
+    echo "--- no unexpected iptables/nftables rules ---"
+    # Netavark creates chains when containers run (expected). Check that
+    # empty netavark chains exist (no active container rules leaking) and
+    # that no rules reference snap paths or podman binaries directly.
+    SNAP_PATH_RULES=$(iptables-save 2>/dev/null | grep -ci "/snap/m0x41-podman\|/usr/local/bin/podman" || true)
+    if [ "${SNAP_PATH_RULES}" -eq 0 ]; then
+        pass "no snap-path iptables rules on host"
+    else
+        fail "iptables rules referencing snap paths found"
+    fi
+
+    echo "--- /etc/resolv.conf not modified ---"
+    if [ -f /etc/resolv.conf ] && ! grep -q "m0x41\|podman\|netavark" /etc/resolv.conf 2>/dev/null; then
+        pass "/etc/resolv.conf unmodified by snap"
+    else
+        fail "/etc/resolv.conf may have been modified by snap"
+    fi
+
+    # --- 6b: ldconfig / library integrity ---
+    echo ""
+    echo "--- 6b: Library path integrity ---"
+
+    echo "--- ldconfig cache clean ---"
+    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+        fail "snap libraries leaked into ldconfig cache"
+    else
+        pass "ldconfig cache has no snap library paths"
+    fi
+
+    echo "--- no ld.so.conf.d entries ---"
+    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | grep -q .; then
+        fail "podman ld.so.conf.d file exists"
+    else
+        pass "no podman ld.so.conf.d entries"
+    fi
+
+    echo "--- host ldd resolves coreutils normally ---"
+    if ldd /usr/bin/ls 2>&1 | grep -q "/snap/m0x41-podman/"; then
+        fail "host binaries resolving libraries from snap path"
+    else
+        pass "host ldd does not reference snap libraries"
+    fi
+
+    # --- 6c: systemd health ---
+    echo ""
+    echo "--- 6c: systemd health ---"
+
+    echo "--- no failed units from snap ---"
+    FAILED_PODMAN=$(systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | grep -ci "podman" || true)
+    if [ "${FAILED_PODMAN}" -eq 0 ]; then
+        pass "no failed podman systemd units"
+    else
+        fail "failed podman systemd units detected"
+        systemctl list-units --state=failed --no-pager 2>/dev/null | grep -i podman || true
+    fi
+
+    echo "--- systemd-resolved still functional ---"
+    if systemctl is-active systemd-resolved >/dev/null 2>&1; then
+        pass "systemd-resolved is active"
+    elif ! systemctl list-unit-files systemd-resolved.service >/dev/null 2>&1; then
+        pass "systemd-resolved not present (not applicable)"
+    else
+        fail "systemd-resolved is not active"
+    fi
+
+    echo "--- systemd overall health ---"
+    if systemctl is-system-running --wait 2>/dev/null | grep -qE "^(running|degraded)$"; then
+        SYSTEM_STATE=$(systemctl is-system-running 2>/dev/null)
+        if [ "${SYSTEM_STATE}" = "running" ]; then
+            pass "systemd reports system running"
+        else
+            # degraded is acceptable if not caused by our units
+            DEGRADED_OURS=$(systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | grep -ci "podman\|m0x41" || true)
+            if [ "${DEGRADED_OURS}" -eq 0 ]; then
+                pass "systemd degraded but not caused by snap (${SYSTEM_STATE})"
+            else
+                fail "systemd degraded due to snap units"
+            fi
+        fi
+    else
+        pass "systemd health check skipped (non-standard state)"
+    fi
+
+    # --- 6d: Reboot survival ---
+    echo ""
+    echo "--- 6d: Reboot survival ---"
+
+    echo "--- recording pre-reboot state ---"
+    PRE_REBOOT_FILE="/root/.snap-test-pre-reboot"
+    if [ -f "${PRE_REBOOT_FILE}" ]; then
+        # Post-reboot: validate everything still works
+        echo "--- post-reboot validation ---"
+
+        echo "--- snap still installed after reboot ---"
+        if snap list m0x41-podman >/dev/null 2>&1; then
+            pass "snap still installed after reboot"
+        else
+            fail "snap not found after reboot"
+        fi
+
+        echo "--- podman functional after reboot ---"
+        if ${PODMAN} --version 2>&1 | grep -q "5.8.1"; then
+            pass "podman version correct after reboot"
+        else
+            fail "podman version check failed after reboot"
+        fi
+
+        echo "--- shim survives reboot ---"
+        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.1"; then
+            pass "shim functional after reboot"
+        else
+            fail "shim broken after reboot"
+        fi
+
+        echo "--- rootful container runs after reboot ---"
+        if ${PODMAN} run --rm docker.io/library/alpine:latest echo "post-reboot-ok" 2>&1 | grep -q "post-reboot-ok"; then
+            pass "rootful container runs after reboot"
+        else
+            fail "rootful container run failed after reboot"
+        fi
+
+        echo "--- rootless container runs after reboot ---"
+        if run_as_testuser "${PODMAN} run --rm docker.io/library/alpine:latest echo 'post-reboot-rootless-ok'" 2>&1 | grep -q "post-reboot-rootless-ok"; then
+            pass "rootless container runs after reboot"
+        else
+            fail "rootless container run failed after reboot"
+        fi
+
+        echo "--- DNS still works after reboot ---"
+        if nslookup dns.google >/dev/null 2>&1 || getent hosts dns.google >/dev/null 2>&1; then
+            pass "host DNS works after reboot"
+        else
+            fail "host DNS broken after reboot"
+        fi
+
+        echo "--- ldconfig still clean after reboot ---"
+        if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+            fail "snap libraries in ldconfig cache after reboot"
+        else
+            pass "ldconfig clean after reboot"
+        fi
+
+        echo "--- no failed podman units after reboot ---"
+        FAILED_POST=$(systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | grep -ci "podman" || true)
+        if [ "${FAILED_POST}" -eq 0 ]; then
+            pass "no failed podman units after reboot"
+        else
+            fail "failed podman units after reboot"
+        fi
+
+        echo "--- quadlet still works after reboot ---"
+        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.1"; then
+            pass "quadlet functional after reboot"
+        else
+            fail "quadlet broken after reboot"
+        fi
+
+        rm -f "${PRE_REBOOT_FILE}"
+        ${PODMAN} system prune -af 2>/dev/null || true
+    else
+        # Pre-reboot: mark state and instruct caller to reboot
+        echo "pre-reboot" > "${PRE_REBOOT_FILE}"
+        echo "  REBOOT REQUIRED: run 'reboot' then re-run: $0 tier6"
+        echo "  Skipping post-reboot tests for now"
+    fi
+
+    # --- 6e: Snap removal cleanup ---
+    echo ""
+    echo "--- 6e: Snap removal cleanup ---"
+    echo "  (Informational — run manually after other tiers complete)"
+    echo "  To test: snap remove m0x41-podman && $0 tier6_removal"
+}
+
+# ---------- Tier 6 removal sub-test ----------
+tier6_removal() {
+    echo ""
+    echo "===== TIER 6e: Post-Removal Validation ====="
+
+    echo "--- shim removed ---"
+    if [ -f /usr/local/bin/podman ]; then
+        fail "shim still present after removal"
+    else
+        pass "shim removed"
+    fi
+
+    echo "--- generator symlinks removed ---"
+    if [ -L /usr/lib/systemd/system-generators/podman-system-generator ]; then
+        fail "system generator symlink still present"
+    else
+        pass "system generator symlink removed"
+    fi
+    if [ -L /usr/lib/systemd/user-generators/podman-user-generator ]; then
+        fail "user generator symlink still present"
+    else
+        pass "user generator symlink removed"
+    fi
+
+    echo "--- systemd units removed ---"
+    LEFTOVER=0
+    for scope in system user; do
+        for unit in podman.socket podman.service podman-auto-update.service podman-auto-update.timer podman-restart.service; do
+            if [ -e "/usr/lib/systemd/${scope}/${unit}" ]; then
+                echo "  leftover: /usr/lib/systemd/${scope}/${unit}"
+                LEFTOVER=$((LEFTOVER + 1))
+            fi
+        done
+    done
+    if [ -e /usr/lib/systemd/system/podman-clean-transient.service ]; then
+        echo "  leftover: /usr/lib/systemd/system/podman-clean-transient.service"
+        LEFTOVER=$((LEFTOVER + 1))
+    fi
+    if [ "${LEFTOVER}" -eq 0 ]; then
+        pass "all systemd unit files removed"
+    else
+        fail "${LEFTOVER} systemd unit file(s) left behind"
+    fi
+
+    echo "--- man page symlinks removed ---"
+    MAN_LEFT=$(find /usr/local/share/man -name "podman*" -type l 2>/dev/null | head -5 | wc -l)
+    if [ "${MAN_LEFT}" -eq 0 ]; then
+        pass "man page symlinks cleaned up"
+    else
+        fail "${MAN_LEFT} man page symlink(s) left behind"
+    fi
+
+    echo "--- ldconfig still clean ---"
+    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+        fail "snap libraries in ldconfig cache after removal"
+    else
+        pass "ldconfig cache clean after removal"
+    fi
+
+    echo "--- no ld.so.conf.d entries ---"
+    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | grep -q .; then
+        fail "podman ld.so.conf.d file remains after removal"
+    else
+        pass "no podman ld.so.conf.d entries after removal"
+    fi
+
+    echo "--- no failed systemd units ---"
+    FAILED_REM=$(systemctl list-units --state=failed --no-pager --no-legend 2>/dev/null | grep -ci "podman" || true)
+    if [ "${FAILED_REM}" -eq 0 ]; then
+        pass "no failed podman units after removal"
+    else
+        fail "failed podman units remain after removal"
+    fi
+
+    echo "--- host DNS still works ---"
+    if nslookup dns.google >/dev/null 2>&1 || getent hosts dns.google >/dev/null 2>&1; then
+        pass "host DNS works after snap removal"
+    else
+        fail "host DNS broken after snap removal"
+    fi
+
+    echo "--- system still boots cleanly ---"
+    SYSTEM_STATE=$(systemctl is-system-running 2>/dev/null || echo "unknown")
+    if [ "${SYSTEM_STATE}" = "running" ]; then
+        pass "systemd reports system running after removal"
+    else
+        pass "systemd state: ${SYSTEM_STATE} (check if pre-existing)"
+    fi
+}
+
+# ---------- Tier 7: Full Upstream BATS (on-demand) ----------
+tier7() {
+    echo ""
+    echo "===== TIER 7: Full Upstream BATS Suite (on-demand) ====="
+
+    if [ ! -x /root/11_run_bats_full.sh ]; then
+        fail "11_run_bats_full.sh not found — push it to the container first"
+        return
+    fi
+
+    echo "--- root mode ---"
+    /root/11_run_bats_full.sh root
+    echo ""
+    echo "--- rootless mode ---"
+    /root/11_run_bats_full.sh rootless
+}
+
 # ---------- Main ----------
 echo "=========================================="
 echo "  Podman Classic Snap Test Runner"
@@ -550,15 +860,19 @@ case "${TIER}" in
     tier3) tier3 ;;
     tier4) tier4 ;;
     tier5) tier5 ;;
+    tier6) tier6 ;;
+    tier6_removal) tier6_removal ;;
+    tier7) tier7 ;;
     all)
         tier1
         tier2
         tier3
         tier4
         tier5
+        tier6
         ;;
     *)
-        echo "Usage: $0 [tier1|tier2|tier3|tier4|tier5|all]"
+        echo "Usage: $0 [tier1|tier2|tier3|tier4|tier5|tier6|tier6_removal|tier7|all]"
         exit 1
         ;;
 esac

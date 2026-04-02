@@ -85,12 +85,14 @@ apt-get install -y -qq \
     jq \
     socat \
     openssl \
+    apache2-utils \
     2>&1 | tail -3
 
-# Disable AppArmor userns restriction if present (not expected on 22.04,
-# but guarded so harmless if the kernel gains it in a point release)
+# Disable AppArmor userns restriction if present (Ubuntu 24.04+).
+# Both set it now and persist it so VM reboots retain the setting.
 if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
     echo 0 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true
+    echo "kernel.apparmor_restrict_unprivileged_userns=0" > /etc/sysctl.d/99-userns.conf 2>/dev/null || true
 fi
 
 # Fix OpenSSL 3.0.x compatibility (Ubuntu 22.04 lacks -quiet flag, added in 3.2)
