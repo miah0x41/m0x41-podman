@@ -342,7 +342,7 @@ Low. The snap's storage configuration works correctly for its intended use case.
 | 1 | Symlink quadlet at `/usr/libexec/podman/quadlet` (install hook) | 44 | Trivial | High | **Done** |
 | 2 | Install `buildah` in `04_test_setup.sh` | 5 | Trivial | High | **Done** |
 | 3 | Build `podman-testing` in `04_test_setup.sh` | 0 (binary can't find snap conmon) | Low | Medium | **Done** (infra limitation) |
-| 4 | Upgrade `conmon` from v2.0.25 to v2.0.26+ | 1 | Low | High | Pending — fixes stderr data loss ([conmon#236](https://github.com/containers/conmon/issues/236)) |
+| 4 | Upgrade `conmon` from v2.0.25 to v2.0.26+ | 1 | Low | High | **Done** — built from source with journald support |
 | 5 | Adapted shim pass (two-pass testing) | 5 | Low | Medium | **Done** |
 | 6 | Accept snap config override failures | 0 (documented) | None | — | Documented |
 | 7 | Accept `pasta` absence as known | 0 (documented) | None | — | Documented |
@@ -357,10 +357,10 @@ Items 1-3 recovered **49 tests**, taking root mode from 506/785 (64%) to 559/785
 |----------|-------|--------|
 | Snap config override (shim forces env vars) | 27 | 5 recoverable via adapted shim; 22 structural — see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md) |
 | `podman-testing` can't find snap conmon | 11 | Infra limitation — binary runs outside snap environment |
-| Health check timing | 2 | Reduced from 5 (initial run) — race condition in conmon pipe handling |
+| Health check timing | 2 | Reduced from 5 (initial run) — may improve further with conmon v2.0.26 |
 | Shell completion | 2 | Config override variant — completion engine uses snap storage path |
 | Container restart timing | 1 | `slirp4netns` restart latency vs `pasta` |
-| `dd` stderr data loss | 1 | **conmon v2.0.25 bug** — fixed in v2.0.26 ([conmon#236](https://github.com/containers/conmon/issues/236)) |
+| `dd` stderr data loss | 0 | **Fixed** — conmon upgraded to v2.0.26 ([conmon#236](https://github.com/containers/conmon/issues/236)) |
 | Registry state leakage | 1 | Test infra — auth directory conflicts between BATS files |
 | Image store path | 1 | Config override variant — test greps `/etc/containers/storage.conf` |
 | **Total** | **46** | |

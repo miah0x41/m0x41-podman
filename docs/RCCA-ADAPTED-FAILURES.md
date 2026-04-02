@@ -149,9 +149,11 @@ The fix shipped in `conmon` **v2.0.26** (2026-02-03), commit `conn_sock: do not 
 
 **Upgrade `conmon` from v2.0.25 to v2.0.26+** in the snap build (`snapcraft.yaml`). This is a direct bug fix — no workaround needed.
 
+**Status: Fixed.** `conmon` upgraded to v2.0.26, built from source with journald support (pre-built binaries lack journald, causing container startup failures). Verified: `dd` stderr is now delivered reliably at all tested counts (1,000 to 700,000 bytes).
+
 ### Priority
 
-High. This is a genuine data-loss bug affecting `--attach stderr` with large stdout volumes. It could affect production workloads that rely on attached container output (e.g. CI/CD pipelines capturing build logs).
+High. This was a genuine data-loss bug affecting `--attach stderr` with large stdout volumes.
 
 ---
 

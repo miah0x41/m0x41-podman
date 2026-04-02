@@ -97,6 +97,29 @@ parts:
       make -j$(nproc)
       make install DESTDIR=$CRAFT_PART_INSTALL
 
+  conmon:
+    plugin: nil
+    build-packages:
+      - curl
+      - gcc
+      - git
+      - libc6-dev
+      - libglib2.0-dev
+      - libseccomp-dev
+      - libsystemd-dev
+      - pkg-config
+      - make
+    override-build: |
+      CONMON_VERSION="2.0.26"
+      curl -fsSL "https://github.com/containers/conmon/archive/refs/tags/v${CONMON_VERSION}.tar.gz" \
+        -o /tmp/conmon.tar.gz
+      tar -xzf /tmp/conmon.tar.gz -C /tmp
+      cd /tmp/conmon-${CONMON_VERSION}
+      make -j$(nproc)
+      mkdir -p $CRAFT_PART_INSTALL/usr/bin
+      install -m 755 bin/conmon $CRAFT_PART_INSTALL/usr/bin/conmon
+      rm -rf /tmp/conmon-${CONMON_VERSION} /tmp/conmon.tar.gz
+
   netavark:
     plugin: nil
     build-packages:
@@ -135,7 +158,6 @@ parts:
       - make
       - pkg-config
     stage-packages:
-      - conmon
       - catatonit
       - fuse-overlayfs
       - libfuse3-3

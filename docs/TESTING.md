@@ -306,7 +306,7 @@ Tested 2026-04-01 on bare-metal (KVM), before corrective actions. Rootless full 
 - **Networking skips/failures** are driven by `505-networking-pasta.bats` (86 tests). The snap bundles `slirp4netns` for rootless networking because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode these skip; in rootless mode they fail.
 - **Snap-specific failures (27 root)** are caused by the snap shim force-setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` environment variables. Of these, 5 are recoverable when the shim respects pre-existing env vars (demonstrated by the adapted pass). The remaining 22 are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path. See [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md).
 - **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
-- **`conmon` v2.0.25 bug (1 failure)**: `030-run.bats` test 34 — stderr data loss with large stdout volumes. Fixed in `conmon` v2.0.26 ([conmon#236](https://github.com/containers/conmon/issues/236)). Upgrade pending.
+- **`conmon` upgraded to v2.0.26**: Fixes stderr data loss with large stdout volumes (`030-run.bats` test 34). See [conmon#236](https://github.com/containers/conmon/issues/236). Built from source (pre-built binaries lack journald support).
 - **Security skips (26)** include 21 SELinux tests — SELinux is not enabled in Ubuntu.
 - **Advanced skips (19)** include checkpoint/restore, SSH, and remote tests.
 
