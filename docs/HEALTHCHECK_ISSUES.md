@@ -155,6 +155,10 @@ Apply solution 5 (source patch) as the primary fix. It solves both rootless and 
 
 Solution 3 (user environment generator) may be added as a belt-and-braces measure for rootless, ensuring `LD_LIBRARY_PATH` is available to all user-scope _Podman_ operations, not just healthchecks. If adopted, the system-paths-first ordering described above must be used.
 
+## Security Review
+
+A comprehensive security analysis of this patch is in [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md), covering the systemd security model, attack surface analysis, known `LD_LIBRARY_PATH` CVEs, and ecosystem precedent (Flatpak, NixOS).
+
 ## Upstream Contribution
 
 The patch is a candidate for upstream submission to `containers/podman`. The rationale — that `LD_LIBRARY_PATH` should be propagated alongside `PATH` in transient healthcheck units — applies to any packaging system where _Podman_'s libraries are not in the default linker path (snaps, AppImage, custom prefix installs). The change follows the existing code pattern and has no effect when `LD_LIBRARY_PATH` is unset.
