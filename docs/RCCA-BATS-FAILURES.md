@@ -2,17 +2,19 @@
 
 This document analyses the test failures observed when running the full upstream _Podman_ BATS test suite (tier 7) against the `m0x41-podman` snap in an LXD VM (Ubuntu 24.04, bare-metal KVM). The VM eliminates all LXD container limitations, so every failure documented here is attributable to the snap packaging, missing test infrastructure, or upstream test assumptions.
 
-Tested 2026-04-01. Root mode: 506/785 pass, 102 fail. Rootless mode: 511/785 pass, 191 fail.
+Initial run 2026-04-01: 506/785 pass, 102 fail. After corrective actions (items 1-3 below): **559/785 pass, 46 fail** (root mode). With adapted shim pass: **564/785 pass, 41 fail**.
 
-## Classification Summary
+> **Status**: Items 1-3 from the Corrective Action Summary have been implemented. This document retains the original analysis for context and marks completed items. See [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md) for the analysis of the 22 residual failures after the adapted shim pass.
 
-| Classification | Root Fail | Rootless Fail | Root Cause |
-|---------------|-----------|---------------|------------|
-| Quadlet path (`$QUADLET`) | 46 | 46 | BATS expects `/usr/libexec/podman/quadlet`; snap installs to `/snap/m0x41-podman/current/usr/libexec/podman/quadlet` |
-| Snap config override | 26 | 32 | Snap sets `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` env vars, overriding test harness temp configs |
-| Missing `buildah` | 5 | 5 | Tests call `buildah` directly; not bundled in snap and not installed in test VM |
-| Missing `podman-testing` binary | 11 | 11 | `331-system-check.bats` requires a Go test helper binary that is not built |
-| Missing `pasta` (rootless only) | 0 | 91 | Snap bundles `slirp4netns`; `505-networking-pasta.bats` requires `pasta` |
+## Classification Summary (Initial Run)
+
+| Classification | Root Fail | Rootless Fail | Root Cause | Status |
+|---------------|-----------|---------------|------------|--------|
+| Quadlet path (`$QUADLET`) | 46 | 46 | BATS expects `/usr/libexec/podman/quadlet`; snap did not symlink it | **Fixed** — install hook now creates symlink |
+| Snap config override | 26 | 32 | Snap sets `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` env vars, overriding test harness temp configs | 5 recovered by adapted shim; 22 structural (see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md)) |
+| Missing `buildah` | 5 | 5 | Tests call `buildah` directly; not installed in test VM | **Fixed** — added to `04_test_setup.sh` |
+| Missing `podman-testing` binary | 11 | 11 | `331-system-check.bats` requires a Go test helper binary | **Partially fixed** — binary builds but can't find snap's conmon (infra limitation) |
+| Missing `pasta` (rootless only) | 0 | 91 | Snap bundles `slirp4netns`; `505-networking-pasta.bats` requires `pasta` | Accepted — `core22` limitation |
 | Health check timing | 5 | 5 | Race conditions in health check state transitions and journal logging |
 | Registry concurrency | 1 | 1 | Shared registry auth directory conflicts across parallel BATS file runs |
 | Shell completion | 2 | 2 | Completion uses `$PODMAN` binary name for image resolution; snap wrapper confuses it |
@@ -335,35 +337,30 @@ Low. The snap's storage configuration works correctly for its intended use case.
 
 ## Corrective Action Summary
 
-| # | Action | Tests Recovered | Effort | Priority |
-|---|--------|----------------|--------|----------|
-| 1 | Export `QUADLET` env var in `11_run_bats_full.sh` | ~42 (46 minus ~4 snap-specific) | Trivial | High |
-| 2 | Install `buildah` in `04_test_setup.sh` | 5 | Trivial | High |
-| 3 | Build `podman-testing` in `04_test_setup.sh` | 11 | Low | Medium |
-| 4 | Investigate health check wrapper overhead | 5 + 1 kube play | Medium | Medium |
-| 5 | Investigate `slirp4netns` restart latency | 1 | Medium | Low |
-| 6 | Accept snap config override failures | 0 (documented) | None | — |
-| 7 | Accept `pasta` absence as known | 0 (documented) | None | — |
+| # | Action | Tests Recovered | Effort | Priority | Status |
+|---|--------|----------------|--------|----------|--------|
+| 1 | Symlink quadlet at `/usr/libexec/podman/quadlet` (install hook) | 44 | Trivial | High | **Done** |
+| 2 | Install `buildah` in `04_test_setup.sh` | 5 | Trivial | High | **Done** |
+| 3 | Build `podman-testing` in `04_test_setup.sh` | 0 (binary can't find snap conmon) | Low | Medium | **Done** (infra limitation) |
+| 4 | Upgrade `conmon` from v2.0.25 to v2.0.26+ | 1 | Low | High | Pending — fixes stderr data loss ([conmon#236](https://github.com/containers/conmon/issues/236)) |
+| 5 | Adapted shim pass (two-pass testing) | 5 | Low | Medium | **Done** |
+| 6 | Accept snap config override failures | 0 (documented) | None | — | Documented |
+| 7 | Accept `pasta` absence as known | 0 (documented) | None | — | Documented |
 
-### Quick Wins (Items 1-3)
+### Results After Corrective Actions
 
-Implementing items 1-3 would recover an estimated **58 tests** with trivial effort, changing the results from:
+Items 1-3 recovered **49 tests**, taking root mode from 506/785 (64%) to 559/785 (71%). The adapted shim pass recovers a further 5, for a combined **564/785 (72%)**.
 
-- **Root**: 506/785 → ~564/785 (72%)
-- **Rootless**: 511/785 → ~569/785 (72%)
+### Residual Failures (Root Mode, 46 Total)
 
-### Residual Failures After Quick Wins
-
-After implementing items 1-3, the expected residual failures would be:
-
-| Category | Root | Rootless | Status |
-|----------|------|----------|--------|
-| Snap config override | ~26 | ~32 | Accepted — fundamental trade-off |
-| Quadlet snap-specific | ~4 | ~4 | Subset of config override |
-| Health check timing | 5 | 5 | Needs investigation |
-| Shell completion | 2 | 2 | Config override variant |
-| Registry concurrency | 1 | 1 | Test infra issue |
-| Networking | 1 | 6 + 85 pasta | `slirp4netns` differences |
-| Image store path | 1 | 1 | Config override variant |
-| **Total** | **~40** | **~136** | |
-| **Excluding pasta** | **~40** | **~51** | |
+| Category | Count | Status |
+|----------|-------|--------|
+| Snap config override (shim forces env vars) | 27 | 5 recoverable via adapted shim; 22 structural — see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md) |
+| `podman-testing` can't find snap conmon | 11 | Infra limitation — binary runs outside snap environment |
+| Health check timing | 2 | Reduced from 5 (initial run) — race condition in conmon pipe handling |
+| Shell completion | 2 | Config override variant — completion engine uses snap storage path |
+| Container restart timing | 1 | `slirp4netns` restart latency vs `pasta` |
+| `dd` stderr data loss | 1 | **conmon v2.0.25 bug** — fixed in v2.0.26 ([conmon#236](https://github.com/containers/conmon/issues/236)) |
+| Registry state leakage | 1 | Test infra — auth directory conflicts between BATS files |
+| Image store path | 1 | Config override variant — test greps `/etc/containers/storage.conf` |
+| **Total** | **46** | |

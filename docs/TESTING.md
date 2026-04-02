@@ -138,8 +138,8 @@ Tested 2026-03-25 (LXC, WSL2) and 2026-04-01 (VM, bare-metal).
 | 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
 | 4 | 28/31 | 28/31 | `BATS` parity — 3 snap-specific failures (see [Known Failures](#known-failures)) |
 | 5a-5d | 20/20 pass | 20/20 pass | Install hook (including socket units, man pages), Quadlet dry-run, live rootful/rootless Quadlet |
-| 5e | 68/73 | 69/73 | `BATS` system-service, socket-activation, quadlet 252-254 — `htpasswd` added for VM |
-| 6 | — | 25/25 pass | Host-side impact: network, ldconfig, systemd, reboot, removal |
+| 5e | 68/73 | 72/73 | `BATS` system-service, socket-activation, quadlet 252-254 — quadlet symlink and `htpasswd` fix for VM |
+| 6 | — | 29/29 pass | Host-side impact: network, ldconfig, systemd, reboot, removal (includes quadlet symlink validation) |
 
 ### `core22` Snap — Multi-Distro
 
@@ -241,32 +241,47 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 
 ### Results — Root Mode (Ubuntu 24.04, LXC vs VM)
 
-LXC tested 2026-03-25 on WSL2. VM tested 2026-04-01 on bare-metal (KVM).
+LXC tested 2026-03-25 on WSL2. VM tested 2026-04-02 on bare-metal (KVM), after corrective actions (quadlet symlink, `buildah`, `podman-testing`).
 
 | Category | Tests | Skip | LXC Pass | LXC Fail | VM Pass | VM Fail | Δ Pass |
 |----------|-------|------|----------|----------|---------|---------|--------|
-| System & Info | 116 | 12 | 83 | 21 | 80 | 24 | -3 |
-| Container Lifecycle | 149 | 11 | 130 | 8 | 131 | 7 | +1 |
-| Images | 104 | 2 | 76 | 23 | 98 | 4 | +22 |
-| Volumes & Storage | 59 | 3–4 | 52 | 3 | 54 | 2 | +2 |
+| System & Info | 116 | 12 | 83 | 21 | 83 | 21 | 0 |
+| Container Lifecycle | 149 | 11 | 130 | 8 | 136 | 2 | +6 |
+| Images | 104 | 2 | 76 | 23 | 99 | 3 | +23 |
+| Volumes & Storage | 59 | 3 | 52 | 3 | 55 | 1 | +3 |
 | Networking | 111 | 89 | 20 | 2 | 21 | 1 | +1 |
-| Pods & Kube | 59 | 2–3 | 53 | 4 | 53 | 3 | 0 |
-| Systemd & Quadlet | 113 | 12 | 40 | 61 | 40 | 61 | 0 |
-| Security & Namespaces | 47 | 25–26 | 18 | 4 | 21 | 0 | +3 |
+| Pods & Kube | 59 | 3 | 53 | 4 | 55 | 1 | +2 |
+| Systemd & Quadlet | 113 | 15 | 40 | 61 | 81 | 17 | +41 |
+| Security & Namespaces | 47 | 26 | 18 | 4 | 21 | 0 | +3 |
 | Advanced | 27 | 19 | 8 | 0 | 8 | 0 | 0 |
-| **Total** | **785** | **176–177** | **480** | **126** | **506** | **102** | **+26** |
+| **Total** | **785** | **180** | **480** | **126** | **559** | **46** | **+79** |
 
-**VM: 506/785 pass (64%)** vs LXC: 480/782 pass (61%). The VM gains **+26 passing tests**:
+**VM: 559/785 pass (71%)** vs LXC: 480/782 pass (61%). The VM gains **+79 passing tests**. With the adapted shim pass (see below), 564/785 pass (72%).
 
-- **LXD limitations eliminated**: 3 LXD-specific failures (user namespace `newuidmap` setuid) drop to 0 in the VM.
-- **Infra gaps closed**: `htpasswd` (`apache2-utils`) added to test setup — 9 fewer infra failures (20 → 11). Remaining 11 are `331-system-check.bats` which requires the `podman_testing` binary.
-- **Images category**: +22 improvement, primarily from `skopeo` and registry tests that work reliably in a full VM.
-- **Security**: +3 from user namespace tests that pass with a full kernel.
-- **Systemd & Quadlet**: No change — 46 cascading `setup_suite` failures in `252-quadlet.bats` remain in both environments.
+Key improvements over LXC:
+
+- **LXD limitations eliminated**: 3 LXD-specific failures drop to 0.
+- **Quadlet symlink**: Install hook now creates `/usr/libexec/podman/quadlet` — recovers 44 tests in `252-quadlet.bats` and `253-podman-quadlet.bats`.
+- **`buildah` installed**: Recovers 5 tests that exercise Podman–Buildah shared storage.
+- **Images/Security**: +23/+3 from tests that work reliably with a full VM kernel.
+
+The 46 residual failures are analysed in [RCCA-BATS-FAILURES.md](RCCA-BATS-FAILURES.md).
+
+### Results — Root Mode Adapted Pass
+
+After the upstream pass, `11_run_bats_full.sh` re-runs snap-classified failures with an adapted shim that respects pre-existing `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` / `CONTAINERS_REGISTRIES_CONF` environment variables. This proves which failures are caused by the shim's config override vs structural snap differences.
+
+| Metric | Upstream | Adapted | Recovered |
+|--------|----------|---------|-----------|
+| Total pass | 559 | 564 | +5 |
+| Total fail | 46 | 41 | -5 |
+| Files re-run | — | 9 | — |
+
+The 5 recovered tests are in `800-config.bats` (+2), `005-info.bats` (+1), `030-run.bats` (+1), `070-build.bats` (+1). The remaining 22 adapted-pass failures are structural — see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md). Of these, 18 share the same root cause: `podman generate systemd` (deprecated) embeds the snap's internal binary path in generated unit files.
 
 ### Results — Rootless Mode (Ubuntu 24.04, VM)
 
-Tested 2026-04-01 on bare-metal (KVM). Rootless full BATS was not previously run in LXC.
+Tested 2026-04-01 on bare-metal (KVM), before corrective actions. Rootless full BATS was not previously run in LXC. To be re-run after corrective actions for updated numbers.
 
 | Category | Tests | Pass | Skip | Snap | LXD | Infra | Other |
 |----------|-------|------|------|------|-----|-------|-------|
@@ -289,10 +304,11 @@ Tested 2026-04-01 on bare-metal (KVM). Rootless full BATS was not previously run
 ### Notes
 
 - **Networking skips/failures** are driven by `505-networking-pasta.bats` (86 tests). The snap bundles `slirp4netns` for rootless networking because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode these skip; in rootless mode they fail.
-- **Snap-specific failures (26 root / 117 rootless)** are caused by the snap setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` as environment variables, which override the test harness's temporary configs. The rootless count is inflated by the 85 pasta failures being classified as snap-specific. Excluding pasta, rootless has 32 snap failures — comparable to root mode's 26.
-- **Security skips (26/29)** include 21 SELinux tests — SELinux is not enabled in Ubuntu.
-- **Advanced skips (19/15)** include checkpoint/restore, SSH, and remote tests.
-- The **"Other" count (65/63)** is inflated by cascading `setup_suite` failures in `252-quadlet.bats` and `253-podman-quadlet.bats` (46 tests), which are effectively infra failures. The failure classifier is heuristic.
+- **Snap-specific failures (27 root)** are caused by the snap shim force-setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` environment variables. Of these, 5 are recoverable when the shim respects pre-existing env vars (demonstrated by the adapted pass). The remaining 22 are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path. See [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md).
+- **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
+- **`conmon` v2.0.25 bug (1 failure)**: `030-run.bats` test 34 — stderr data loss with large stdout volumes. Fixed in `conmon` v2.0.26 ([conmon#236](https://github.com/containers/conmon/issues/236)). Upgrade pending.
+- **Security skips (26)** include 21 SELinux tests — SELinux is not enabled in Ubuntu.
+- **Advanced skips (19)** include checkpoint/restore, SSH, and remote tests.
 
 ### `core22` Snap — Host-Side Impact (Tier 6, VM)
 
