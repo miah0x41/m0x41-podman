@@ -127,16 +127,27 @@ This is inserted immediately after the existing `PATH` propagation block.
 - No fork required — applied via `sed` or `patch` in the snapcraft `override-build` step before `make podman`
 - The Go `-overlay` build flag is an alternative if modifying the source tree is undesirable
 
-**Build integration:** Since `snapcraft.yaml` already clones the _Podman_ source (`source-tag: v5.8.1`), the patch can be applied in the `override-build` step:
+**Build integration:** The patch file at `patches/healthcheck-ld-library-path.patch` is applied in the `podman` part's `override-build` step in `snapcraft.yaml`:
 
 ```yaml
 override-build: |
-  # Propagate LD_LIBRARY_PATH in healthcheck transient units
-  sed -i '/--setenv=PATH=.*path)/a\\t\tldLibPath := os.Getenv("LD_LIBRARY_PATH")\n\t\tif ldLibPath != "" {\n\t\t\tcmd = append(cmd, "--setenv=LD_LIBRARY_PATH="+ldLibPath)\n\t\t}' libpod/healthcheck_linux.go
+  patch -p1 < $CRAFT_PROJECT_DIR/patches/healthcheck-ld-library-path.patch
   # ... existing build steps
 ```
 
-A patch file (`patches/healthcheck-ld-library-path.patch`) is preferred over inline `sed` for auditability.
+## Testing
+
+Section 5g of `scripts/05_run_tests.sh` validates the fix for both rootful and rootless:
+
+| Test | What It Validates |
+|------|-------------------|
+| Container starts with healthcheck | Basic healthcheck container lifecycle |
+| Transient timer exists | `systemd-run` created the timer unit |
+| Transient service has `LD_LIBRARY_PATH` | The patch propagated the environment variable |
+| Manual healthcheck run succeeds | The healthcheck binary can find its libraries |
+| Status is healthy | End-to-end healthcheck is functional |
+
+All five tests run for both rootful (system scope) and rootless (user scope), totalling 10 tests.
 
 ## Recommended Approach
 

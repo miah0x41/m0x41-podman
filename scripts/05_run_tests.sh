@@ -535,6 +535,108 @@ CEOF
     else
         echo "  Skipped: Go or Podman source not available"
     fi
+
+    # --- 5g: Healthcheck transient unit validation ---
+    echo ""
+    echo "--- 5g: Healthcheck transient unit validation ---"
+
+    # Rootful: start a container with a healthcheck, verify the transient
+    # timer propagates LD_LIBRARY_PATH and the healthcheck executes.
+    HC_NAME="snap-hc-test"
+    echo "--- rootful healthcheck: start container ---"
+    ${PODMAN} rm -f "${HC_NAME}" 2>/dev/null || true
+    if ${PODMAN} run -d --name "${HC_NAME}" \
+        --health-cmd "echo ok" \
+        --health-interval 60s \
+        --health-start-period 0s \
+        docker.io/library/alpine:latest sleep 300 2>&1; then
+        pass "rootful healthcheck container started"
+    else
+        fail "rootful healthcheck container failed to start"
+    fi
+
+    # Give systemd-run a moment to register the transient timer.
+    sleep 2
+
+    echo "--- rootful healthcheck: transient timer exists ---"
+    HC_CONTAINER_ID=$(${PODMAN} inspect --format '{{.Id}}' "${HC_NAME}" 2>/dev/null) || true
+    if [ -n "${HC_CONTAINER_ID}" ] && systemctl list-units --type=timer --no-pager 2>/dev/null | grep -q "${HC_CONTAINER_ID:0:12}"; then
+        pass "rootful healthcheck transient timer exists"
+    else
+        fail "rootful healthcheck transient timer not found"
+    fi
+
+    echo "--- rootful healthcheck: transient service has LD_LIBRARY_PATH ---"
+    HC_SVC=$(systemctl list-units --type=timer --no-pager 2>/dev/null | grep "${HC_CONTAINER_ID:0:12}" | awk '{print $1}' | sed 's/\.timer$/.service/') || true
+    if [ -n "${HC_SVC}" ] && systemctl show "${HC_SVC}" --property=Environment 2>/dev/null | grep -q "LD_LIBRARY_PATH"; then
+        pass "rootful healthcheck transient service has LD_LIBRARY_PATH"
+    else
+        fail "rootful healthcheck transient service missing LD_LIBRARY_PATH"
+    fi
+
+    echo "--- rootful healthcheck: manual run succeeds ---"
+    if ${PODMAN} healthcheck run "${HC_NAME}" 2>&1; then
+        pass "rootful healthcheck run succeeded"
+    else
+        fail "rootful healthcheck run failed"
+    fi
+
+    echo "--- rootful healthcheck: status is healthy ---"
+    HC_STATUS=$(${PODMAN} inspect --format '{{.State.Health.Status}}' "${HC_NAME}" 2>/dev/null) || true
+    if [ "${HC_STATUS}" = "healthy" ]; then
+        pass "rootful healthcheck status is healthy"
+    else
+        fail "rootful healthcheck status is '${HC_STATUS}', expected 'healthy'"
+    fi
+
+    ${PODMAN} rm -f "${HC_NAME}" 2>/dev/null || true
+
+    # Rootless: same validation under the test user.
+    HC_NAME_RL="snap-hc-test-rl"
+    echo "--- rootless healthcheck: start container ---"
+    run_as_testuser "${PODMAN} rm -f ${HC_NAME_RL}" 2>/dev/null || true
+    if run_as_testuser "${PODMAN} run -d --name ${HC_NAME_RL} --health-cmd 'echo ok' --health-interval 60s --health-start-period 0s docker.io/library/alpine:latest sleep 300" 2>&1; then
+        pass "rootless healthcheck container started"
+    else
+        fail "rootless healthcheck container failed to start"
+    fi
+
+    sleep 2
+
+    echo "--- rootless healthcheck: transient timer exists ---"
+    HC_RL_ID=$(run_as_testuser "${PODMAN} inspect --format '{{.Id}}' ${HC_NAME_RL}" 2>/dev/null) || true
+    if [ -n "${HC_RL_ID}" ] && run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep -q "${HC_RL_ID:0:12}"; then
+        pass "rootless healthcheck transient timer exists"
+    else
+        fail "rootless healthcheck transient timer not found"
+    fi
+
+    echo "--- rootless healthcheck: transient service has LD_LIBRARY_PATH ---"
+    HC_RL_SVC=$(run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep "${HC_RL_ID:0:12}" | awk '{print $1}' | sed 's/\.timer$/.service/') || true
+    if [ -n "${HC_RL_SVC}" ] && run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=Environment" 2>/dev/null | grep -q "LD_LIBRARY_PATH"; then
+        pass "rootless healthcheck transient service has LD_LIBRARY_PATH"
+    else
+        fail "rootless healthcheck transient service missing LD_LIBRARY_PATH"
+    fi
+
+    echo "--- rootless healthcheck: manual run succeeds ---"
+    if run_as_testuser "${PODMAN} healthcheck run ${HC_NAME_RL}" 2>&1; then
+        pass "rootless healthcheck run succeeded"
+    else
+        fail "rootless healthcheck run failed"
+    fi
+
+    echo "--- rootless healthcheck: status is healthy ---"
+    HC_RL_STATUS=$(run_as_testuser "${PODMAN} inspect --format '{{.State.Health.Status}}' ${HC_NAME_RL}" 2>/dev/null) || true
+    if [ "${HC_RL_STATUS}" = "healthy" ]; then
+        pass "rootless healthcheck status is healthy"
+    else
+        fail "rootless healthcheck status is '${HC_RL_STATUS}', expected 'healthy'"
+    fi
+
+    run_as_testuser "${PODMAN} rm -f ${HC_NAME_RL}" 2>/dev/null || true
+    ${PODMAN} system prune -af 2>&1 || true
+    run_as_testuser "${PODMAN} system prune -af" 2>&1 || true
 }
 
 # ---------- Main ----------
