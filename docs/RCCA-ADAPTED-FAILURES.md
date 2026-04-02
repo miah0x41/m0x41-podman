@@ -137,17 +137,21 @@ Low. `runlabel` is rarely used and primarily a CRI-O/OpenShift feature.
 
 ### Root Cause
 
-The test runs `dd if=/dev/zero count=700000 bs=1` inside a container with `--attach stderr` and checks that stderr contains `700000+0 records in`. The actual output is empty — the stderr stream was not captured.
+The test runs `dd if=/dev/zero count=700000 bs=1` inside a container with `--attach stderr` and checks that stderr contains `700000+0 records in`. The actual output is empty — the stderr stream is lost.
 
-This is a timing/buffering issue. The snap's `conmon-wrapper` adds an extra `exec` layer, which may affect how stderr is attached and flushed for large-output containers. The test is specifically designed to catch truncation issues, and the snap's wrapper chain introduces the kind of indirection that can trigger them.
+**Root cause identified**: the snap bundles `conmon` v2.0.25, which contains a known bug ([containers/conmon#236](https://github.com/containers/conmon/issues/236)). When large volumes of data flow through stdout, the socket write function encounters `EAGAIN` (non-blocking I/O) and prematurely closes the attached console sockets, causing stderr to be lost. The bug is non-deterministic — with small data volumes (< ~5000 bytes) stderr is usually delivered; above that threshold, delivery becomes unreliable.
+
+This is **not** caused by the `conmon-wrapper`. The wrapper only sets `LD_LIBRARY_PATH` and `PATH` before exec'ing conmon — it does not affect pipe or socket handling.
+
+The fix shipped in `conmon` **v2.0.26** (2026-02-03), commit `conn_sock: do not fail on EAGAIN`.
 
 ### Corrective Action
 
-**Investigation needed.** This could indicate a real issue with large-output containers when using `--attach stderr`. Profile whether the `conmon-wrapper`'s exec layer causes stderr to be lost or truncated.
+**Upgrade `conmon` from v2.0.25 to v2.0.26+** in the snap build (`snapcraft.yaml`). This is a direct bug fix — no workaround needed.
 
 ### Priority
 
-Medium. If `--attach stderr` loses output in production, this is a genuine functional issue.
+High. This is a genuine data-loss bug affecting `--attach stderr` with large stdout volumes. It could affect production workloads that rely on attached container output (e.g. CI/CD pipelines capturing build logs).
 
 ---
 
