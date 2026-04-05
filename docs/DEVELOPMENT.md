@@ -118,7 +118,7 @@ The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmo
 
 _Podman_ creates transient systemd timer and service units for container healthchecks. It reads `/proc/self/exe` to determine its own binary path and embeds that in the transient unit's `ExecStart`. After the shim `exec()`s the real binary, `/proc/self/exe` resolves to the raw snap path — bypassing the shim's `LD_LIBRARY_PATH` setup. There is no upstream configuration option or environment variable to override this path.
 
-Fix: a 3-line patch (`patches/healthcheck-ld-library-path.patch`) to `libpod/healthcheck_linux.go` that propagates `LD_LIBRARY_PATH` via `systemd-run --setenv`, mirroring the existing `PATH` propagation. This is the only upstream source modification in the snap. See [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) for the full root cause analysis, including why alternative approaches (`ldconfig`, compiled wrapper, user environment generator, transient unit monitor) were rejected. See [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md) for the security analysis.
+Fix: a 3-line patch (`patches/healthcheck-ld-library-path.patch`) to `libpod/healthcheck_linux.go` that propagates `LD_LIBRARY_PATH` via `systemd-run --setenv`, mirroring the existing `PATH` propagation. This is the only upstream source modification in the snap. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis, including why alternative approaches (`ldconfig`, compiled wrapper, user environment generator, transient unit monitor) were rejected. See [PATCH_SECURITY_REVIEW.md](investigations/PATCH_SECURITY_REVIEW.md) for the security analysis.
 
 ### `uidmap` and `dbus-user-session` Required on Host for Rootless
 

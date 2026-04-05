@@ -187,7 +187,7 @@ The service unit uses the shim at `/usr/local/bin/podman`, not the snap binary d
 
 ## Source Modification
 
-The snap applies one patch to the upstream _Podman_ source at build time. _Podman_ creates transient systemd units for container healthchecks and embeds its own binary path in them. In the snap, this path resolves to the raw binary inside the snap filesystem, which lacks the library path setup needed to find bundled libraries. The patch adds three lines to `libpod/healthcheck_linux.go` that propagate `LD_LIBRARY_PATH` to the transient unit — mirroring how _Podman_ already propagates `PATH`. Without this patch, container healthchecks fail silently. See [COMPONENTS.md](COMPONENTS.md#source-modifications) for details and [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) for the full analysis.
+The snap applies one patch to the upstream _Podman_ source at build time. _Podman_ creates transient systemd units for container healthchecks and embeds its own binary path in them. In the snap, this path resolves to the raw binary inside the snap filesystem, which lacks the library path setup needed to find bundled libraries. The patch adds three lines to `libpod/healthcheck_linux.go` that propagate `LD_LIBRARY_PATH` to the transient unit — mirroring how _Podman_ already propagates `PATH`. Without this patch, container healthchecks fail silently. See [COMPONENTS.md](COMPONENTS.md#source-modifications) for details and [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full analysis.
 
 ## Unsupported Features
 

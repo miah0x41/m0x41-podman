@@ -75,7 +75,7 @@ A compiled C wrapper at `/usr/local/bin/podman` that sets `LD_LIBRARY_PATH` and 
 
 ### 2. System-Wide `ldconfig` — Rejected
 
-Registering the snap's library directories in `/etc/ld.so.conf.d/` was the original approach. It caused `systemd-networkd` and `systemd-resolved` to load the snap's `libseccomp.so.2.5.3` instead of the system's `2.5.5`, resulting in SIGSEGV crashes on boot. See [RCCA #3](../RCCA-3-podman-snap-library-poisoning.md) for the full incident analysis. This approach is permanently rejected.
+Registering the snap's library directories in `/etc/ld.so.conf.d/` was the original approach. It caused `systemd-networkd` and `systemd-resolved` to load the snap's `libseccomp.so.2.5.3` instead of the system's `2.5.5`, resulting in SIGSEGV crashes on boot. This approach is permanently rejected.
 
 ### 3. User Environment Generator — Rootless Only
 

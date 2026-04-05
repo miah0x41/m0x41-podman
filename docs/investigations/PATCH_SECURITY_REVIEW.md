@@ -78,7 +78,7 @@ The `LD_LIBRARY_PATH` is scoped to the individual transient service unit. It doe
 - Other transient units
 - Unrelated processes
 
-This is a critical improvement over the previous approach (system-wide `ldconfig` poisoning, see [RCCA #3](../RCCA-3-podman-snap-library-poisoning.md)), which affected every process on the host and caused `systemd-networkd` and `systemd-resolved` to crash with SIGSEGV.
+This is a critical improvement over the previous approach (system-wide `ldconfig` poisoning), which affected every process on the host and caused `systemd-networkd` and `systemd-resolved` to crash with SIGSEGV.
 
 ## Known `LD_LIBRARY_PATH` Vulnerability Classes
 

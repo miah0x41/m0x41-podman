@@ -1,0 +1,216 @@
+# Test Results
+
+Recorded results from the test tiers described in [TESTING.md](TESTING.md).
+
+## `core22` Snap — Single Distro (Ubuntu 24.04)
+
+Tested 2026-03-25 (LXC, WSL2) and 2026-04-01 (VM, bare-metal).
+
+| Tier | LXC Container | LXD VM | Description |
+|------|--------------|--------|-------------|
+| 1 | 7/7 pass | 7/7 pass | Version, `crun`, `netavark`, overlay, `conmon`, config paths |
+| 2 | 8/8 pass | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
+| 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
+| 4 | 28/31 | 28/31 | `BATS` parity — 3 snap-specific failures (see [Known Failures](#known-failures)) |
+| 5a-5d | 20/20 pass | 20/20 pass | Install hook (including socket units, man pages), Quadlet dry-run, live rootful/rootless Quadlet |
+| 5e | 68/73 | 72/73 | `BATS` system-service, socket-activation, quadlet 252-254 — quadlet symlink and `htpasswd` fix for VM |
+| 6 | — | 29/29 pass | Host-side impact: network, ldconfig, systemd, reboot, removal (includes quadlet symlink validation) |
+
+## `core22` Snap — Multi-Distro
+
+Tested 2026-03-25 on WSL2. All distros run in parallel via `06_test_multi_distro.sh`.
+
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (20) |
+|--------|---------|------------|------------|------------|-------------|
+| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 20/20 |
+| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 20/20 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 19/20 |
+| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 18/20 |
+
+## Native Build (Ubuntu 24.04, VM)
+
+The baseline — all tiers pass against _Podman_ built and installed natively (no snap packaging).
+
+| Tier | Result | Description |
+|------|--------|-------------|
+| 1 | 3/3 pass | Build validation |
+| 2 | 54/54 pass | Unit tests (`Ginkgo` suites) |
+| 3 | 7/7 pass | Rootless functional + `BATS` smoke (31 tests) |
+| 4 | 352/352 pass | Root `BATS` smoke (31) + `Ginkgo` integration (321 specs) |
+| 5 | 544/548 | API v2 tests (4 upstream failures in OCI artifact tests) |
+
+## Wrapper Dependency Detection — Multi-Distro
+
+Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_launch.sh`.
+
+| Distro | Wrapper Tests (18) |
+|--------|--------------------|
+| Ubuntu 22.04 | **18/18 pass** |
+| Ubuntu 24.04 | **18/18 pass** |
+| Debian 12 | **18/18 pass** |
+| CentOS 9 Stream | **18/18 pass** |
+| Fedora 42 | **18/18 pass** |
+
+## Known Failures
+
+### Tier 4: 3 `BATS` Failures (Snap Config Conflicts)
+
+| Test | Cause |
+|------|-------|
+| `podman info - json` | Snap's `CONTAINERS_CONF` env var overrides the test's temporary config; teardown cleans up state that was never created |
+| `CONTAINERS_CONF_OVERRIDE` | Test sets `CONTAINERS_CONF` — but the snap's env var (from `snapcraft.yaml`) takes precedence |
+| `empty string defaults` | Test expects a warning when no storage driver is configured; the snap always provides `CONTAINERS_STORAGE_CONF` |
+
+All three are snap-specific environment conflicts, not functional regressions. The same tests pass in the native build.
+
+### Tier 5e: `252-quadlet.bats` Failures
+
+In LXC (without `htpasswd`): 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact`. In the VM (with `apache2-utils` installed): 4 failures — the `artifact` test passes. The remaining 4 are snap-specific environment conflicts similar to the tier 4 failures. Tests `253-podman-quadlet.bats` (9/9) and `254-podman-quadlet-multi.bats` (5/5) pass fully in both environments.
+
+### Fedora 42: Rootless Failures in LXD
+
+`newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 6 tests.
+
+### Rootless Requires Host `uidmap` and `dbus-user-session`
+
+The snap does not bundle `uidmap` (`newuidmap`/`newgidmap`) or `dbus-user-session` — these must exist on the host and are accessed through classic confinement. `uidmap` provides the setuid binaries for user namespace creation; `dbus-user-session` provides the D-Bus user session bus needed by `loginctl enable-linger` and rootless Podman for `XDG_RUNTIME_DIR`. Ubuntu Desktop installs both by default, but server, minimal, and container images do not. Without them, rootless operations fail. Install with `sudo apt install uidmap dbus-user-session` (Debian/Ubuntu) or `sudo dnf install shadow-utils` (Fedora/CentOS).
+
+### Fedora/CentOS Requires Host `libgpg-error`
+
+The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and CentOS this must be installed on the host: `sudo dnf install libgpg-error`. On Debian/Ubuntu it is typically already present.
+
+### Non-Ubuntu Distros: Rootful Requires Host `iptables`
+
+`netavark` calls `iptables` as a child process of `conmon`, which does not inherit the snap wrapper's `PATH`. Ubuntu ships `iptables` by default; Debian 12, CentOS 9, and Fedora 42 use `nftables` and require a compatibility package:
+
+| Distro | Package |
+|--------|---------|
+| Debian 12 | `apt install iptables` |
+| CentOS 9 / Fedora 42 | `dnf install iptables-nft` |
+
+Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fails in LXD on WSL2 due to missing kernel `nftables` modules. On hosts with full `nftables` support, this may work.
+
+## Full Upstream BATS Suite
+
+In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (78 files, ~780 tests). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
+
+### Running the Full Suite
+
+```bash
+# Root mode (inside the test container, after 04_test_setup.sh)
+/root/11_run_bats_full.sh root
+
+# Rootless mode
+/root/11_run_bats_full.sh rootless
+```
+
+The script runs every `*.bats` file in the upstream `test/system/` directory, groups results by functional category, and classifies failures into four buckets:
+
+| Classification | Meaning |
+|---------------|---------|
+| **Snap** | Snap-specific environment conflict (`CONTAINERS_CONF` override, path issues) |
+| **LXD** | LXD container limitation (`newuidmap` setuid, namespace permissions) |
+| **Infra** | Missing test infrastructure (registry, `htpasswd`, `skopeo`, test binary) |
+| **Other** | Requires manual investigation |
+
+### Results — Root Mode (Ubuntu 24.04, LXC vs VM)
+
+LXC tested 2026-03-25 on WSL2. VM tested 2026-04-02 on bare-metal (KVM), after corrective actions (quadlet symlink, `buildah`, `podman-testing`).
+
+| Category | Tests | Skip | LXC Pass | LXC Fail | VM Pass | VM Fail | Δ Pass |
+|----------|-------|------|----------|----------|---------|---------|--------|
+| System & Info | 116 | 12 | 83 | 21 | 83 | 21 | 0 |
+| Container Lifecycle | 149 | 11 | 130 | 8 | 136 | 2 | +6 |
+| Images | 104 | 2 | 76 | 23 | 99 | 3 | +23 |
+| Volumes & Storage | 59 | 3 | 52 | 3 | 55 | 1 | +3 |
+| Networking | 111 | 89 | 20 | 2 | 21 | 1 | +1 |
+| Pods & Kube | 59 | 3 | 53 | 4 | 55 | 1 | +2 |
+| Systemd & Quadlet | 113 | 15 | 40 | 61 | 81 | 17 | +41 |
+| Security & Namespaces | 47 | 26 | 18 | 4 | 21 | 0 | +3 |
+| Advanced | 27 | 19 | 8 | 0 | 8 | 0 | 0 |
+| **Total** | **785** | **180** | **480** | **126** | **559** | **46** | **+79** |
+
+**VM: 559/785 pass (71%)** vs LXC: 480/782 pass (61%). The VM gains **+79 passing tests**. With the adapted shim pass (see below), 564/785 pass (72%).
+
+Key improvements over LXC:
+
+- **LXD limitations eliminated**: 3 LXD-specific failures drop to 0.
+- **Quadlet symlink**: Install hook now creates `/usr/libexec/podman/quadlet` — recovers 44 tests in `252-quadlet.bats` and `253-podman-quadlet.bats`.
+- **`buildah` installed**: Recovers 5 tests that exercise Podman–Buildah shared storage.
+- **Images/Security**: +23/+3 from tests that work reliably with a full VM kernel.
+
+The 46 residual failures are analysed in [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
+
+### Results — Root Mode Adapted Pass
+
+After the upstream pass, `11_run_bats_full.sh` re-runs snap-classified failures with an adapted shim that respects pre-existing `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` / `CONTAINERS_REGISTRIES_CONF` environment variables. This proves which failures are caused by the shim's config override vs structural snap differences.
+
+| Metric | Upstream | Adapted | Recovered |
+|--------|----------|---------|-----------|
+| Total pass | 559 | 564 | +5 |
+| Total fail | 46 | 41 | -5 |
+| Files re-run | — | 9 | — |
+
+The 5 recovered tests are in `800-config.bats` (+2), `005-info.bats` (+1), `030-run.bats` (+1), `070-build.bats` (+1). The remaining 22 adapted-pass failures are structural — see [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md). Of these, 18 share the same root cause: `podman generate systemd` (deprecated) embeds the snap's internal binary path in generated unit files.
+
+### Results — Rootless Mode (Ubuntu 24.04, VM)
+
+Tested 2026-04-01 on bare-metal (KVM), before corrective actions. Rootless full BATS was not previously run in LXC. To be re-run after corrective actions for updated numbers.
+
+| Category | Tests | Pass | Skip | Snap | LXD | Infra | Other |
+|----------|-------|------|------|------|-----|-------|-------|
+| System & Info | 116 | 82 | 10 | 6 | 0 | 11 | 7 |
+| Container Lifecycle | 149 | 136 | 6 | 3 | 0 | 0 | 4 |
+| Images | 104 | 97 | 3 | 1 | 0 | 0 | 3 |
+| Volumes & Storage | 59 | 52 | 7 | 0 | 0 | 0 | 0 |
+| Networking | 111 | 19 | 1 | 91 | 0 | 0 | 0 |
+| Pods & Kube | 59 | 54 | 2 | 0 | 0 | 0 | 3 |
+| Systemd & Quadlet | 113 | 41 | 10 | 16 | 0 | 0 | 46 |
+| Security & Namespaces | 47 | 18 | 29 | 0 | 0 | 0 | 0 |
+| Advanced | 27 | 12 | 15 | 0 | 0 | 0 | 0 |
+| **Total** | **785** | **511** | **83** | **117** | **0** | **11** | **63** |
+
+**511/785 pass (65%), 83 skipped, 191 failures.** Rootless actually passes **5 more tests** than root mode (511 vs 506), because root-only skips (e.g. `060-mount.bats`, `550-pause-process.bats`) become rootless-passing tests. Key differences from root mode:
+
+- **Networking: 91 snap failures** — `505-networking-pasta.bats` (85 failures) and `500-networking.bats` (6 failures). In root mode, pasta tests are skipped; in rootless mode they fail because `slirp4netns` is used instead of `pasta`. The snap bundles `slirp4netns` because `pasta` is not available on the `core22` base.
+- **LXD failures: 0** — confirms that all rootless user namespace operations work correctly in a VM with `apparmor_restrict_unprivileged_userns=0`.
+
+### Notes
+
+- **Networking skips/failures** are driven by `505-networking-pasta.bats` (86 tests). The snap bundles `slirp4netns` for rootless networking because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode these skip; in rootless mode they fail.
+- **Snap-specific failures (27 root)** are caused by the snap shim force-setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` environment variables. Of these, 5 are recoverable when the shim respects pre-existing env vars (demonstrated by the adapted pass). The remaining 22 are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
+- **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
+- **`conmon` upgraded to v2.0.26**: Fixes stderr data loss with large stdout volumes (`030-run.bats` test 34). See [conmon#236](https://github.com/containers/conmon/issues/236). Built from source (pre-built binaries lack journald support).
+- **Security skips (26)** include 21 SELinux tests — SELinux is not enabled in Ubuntu.
+- **Advanced skips (19)** include checkpoint/restore, SSH, and remote tests.
+
+## `core22` Snap — Host-Side Impact (Tier 6, VM)
+
+Tested 2026-04-01 on bare-metal (KVM). These tests can only run in a VM because they validate system-level side effects invisible from inside a nested container.
+
+| Test Group | Tests | Result |
+|-----------|-------|--------|
+| 6a: Network integrity | 5 | 5/5 pass — DNS, default route, no stale interfaces, no snap iptables paths, resolv.conf clean |
+| 6b: Library path integrity | 3 | 3/3 pass — ldconfig cache, ld.so.conf.d, host `ldd` all clean |
+| 6c: systemd health | 3 | 3/3 pass — no failed podman units, systemd-resolved active, system running |
+| 6d: Reboot survival | 9 | 9/9 pass — snap, shim, podman, rootful, rootless, DNS, ldconfig, units, quadlet all survive reboot |
+| 6e: Snap removal cleanup | 9 | 9/9 pass — shim, generators, units, man pages, ldconfig, ld.so.conf.d, systemd all clean after removal |
+| **Total** | **29** | **29/29 pass** |
+
+## Test Environment
+
+Tests have been run on two hosts:
+
+**WSL2** (LXC container tests, 2026-03-25):
+
+- **Host**: WSL2 (Linux 6.6.87.2-microsoft-standard-WSL2)
+- **LXD**: 5.21.4 LTS (snap)
+- **LXC containers**: `security.nesting=true`, `security.syscalls.intercept.mknod=true`, `security.syscalls.intercept.setxattr=true`
+
+**Bare-metal** (VM tests, 2026-04-01):
+
+- **Host**: Intel i7-8700, 125 GB RAM, Linux 6.8.0-100-generic (Ubuntu)
+- **LXD**: 5.21.4 LTS (snap)
+- **LXD VMs**: `security.secureboot=false`, no nesting or syscall flags needed
+- **Note**: `apparmor_restrict_unprivileged_userns` must be set to `0` for rootless tests on Ubuntu 24.04+. The test setup script (`04_test_setup.sh`) handles this and persists it via sysctl.
