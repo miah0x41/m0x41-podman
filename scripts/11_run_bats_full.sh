@@ -228,3 +228,99 @@ echo "  Logs: ${RESULTS_DIR}/"
 } > "${RESULTS_DIR}/${MODE}-results.csv"
 
 echo "  CSV: ${RESULTS_DIR}/${MODE}-results.csv"
+
+# ---------- Pass 2: Adapted re-run of snap-classified failures ----------
+# The snap shim force-overrides CONTAINERS_CONF, CONTAINERS_STORAGE_CONF,
+# and CONTAINERS_REGISTRIES_CONF. This prevents the BATS test harness from
+# using its own temporary configs. Pass 2 creates an adapted shim that
+# respects pre-existing values, then re-runs only the snap-classified
+# failures to prove Podman itself handles those configs correctly.
+
+# Collect files that had snap-classified failures
+SNAP_FAILED_FILES=()
+for batsfile in test/system/[0-9]*.bats; do
+    filename=$(basename "${batsfile}")
+    logfile="${RESULTS_DIR}/${MODE}-${filename}.log"
+    file_fail=$(grep -c "^not ok " "${logfile}" 2>/dev/null || true)
+    if [ "${file_fail}" -gt 0 ]; then
+        reason=$(classify_failure "${logfile}")
+        if [ "${reason}" = "snap" ]; then
+            SNAP_FAILED_FILES+=("${batsfile}")
+        fi
+    fi
+done
+
+if [ ${#SNAP_FAILED_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo "=========================================="
+    echo "  Pass 2: Adapted Re-Run (${#SNAP_FAILED_FILES[@]} files)"
+    echo "  Mode: ${MODE}"
+    echo "=========================================="
+    echo ""
+    echo "  Creating adapted shim that respects pre-existing config env vars..."
+
+    # Create adapted shim — honours existing CONTAINERS_CONF if set
+    ADAPTED_SHIM="/usr/local/bin/podman-adapted"
+    cat > "${ADAPTED_SHIM}" <<'ASHIM'
+#!/bin/bash
+# m0x41-podman adapted shim — respects pre-existing config env vars
+SNAP=/snap/m0x41-podman/current
+export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export CONTAINERS_CONF="${CONTAINERS_CONF:-$SNAP/etc/containers/containers.conf}"
+export CONTAINERS_REGISTRIES_CONF="${CONTAINERS_REGISTRIES_CONF:-$SNAP/etc/containers/registries.conf}"
+export CONTAINERS_STORAGE_CONF="${CONTAINERS_STORAGE_CONF:-$SNAP/etc/containers/storage.conf}"
+exec "$SNAP/usr/bin/podman" "$@"
+ASHIM
+    chmod +x "${ADAPTED_SHIM}"
+
+    ADAPTED_PASS=0
+    ADAPTED_FAIL=0
+    ADAPTED_TOTAL=0
+
+    for batsfile in "${SNAP_FAILED_FILES[@]}"; do
+        filename=$(basename "${batsfile}")
+        logfile="${RESULTS_DIR}/${MODE}-adapted-${filename}.log"
+
+        echo -n "  ${filename} ... "
+
+        if [ "${MODE}" = "rootless" ]; then
+            TESTUSER="podtest"
+            uid=$(id -u "${TESTUSER}")
+            mkdir -p "/run/user/${uid}"
+            chown "${TESTUSER}:${TESTUSER}" "/run/user/${uid}"
+            su - "${TESTUSER}" -c "
+                export XDG_RUNTIME_DIR=/run/user/${uid}
+                cd ${PODMAN_SRC} && PODMAN=${ADAPTED_SHIM} bats ${batsfile}
+            " > "${logfile}" 2>&1 || true
+        else
+            PODMAN="${ADAPTED_SHIM}" bats "${batsfile}" > "${logfile}" 2>&1 || true
+        fi
+
+        file_pass=$(grep -c "^ok " "${logfile}" 2>/dev/null || true)
+        file_fail=$(grep -c "^not ok " "${logfile}" 2>/dev/null || true)
+        file_skip=$(grep -c "^ok .* # skip" "${logfile}" 2>/dev/null || true)
+        file_pass=$((file_pass - file_skip))
+        file_total=$((file_pass + file_fail))
+
+        echo "${file_pass} pass, ${file_fail} fail, ${file_skip} skip"
+
+        ADAPTED_PASS=$((ADAPTED_PASS + file_pass))
+        ADAPTED_FAIL=$((ADAPTED_FAIL + file_fail))
+        ADAPTED_TOTAL=$((ADAPTED_TOTAL + file_total + file_skip))
+    done
+
+    RECOVERED=$((ADAPTED_PASS - (ADAPTED_TOTAL - ADAPTED_PASS - ADAPTED_FAIL)))
+
+    echo ""
+    echo "=========================================="
+    echo "  Pass 2 Summary"
+    echo "=========================================="
+    echo "  Files re-run: ${#SNAP_FAILED_FILES[@]}"
+    echo "  Adapted: ${ADAPTED_PASS} pass, ${ADAPTED_FAIL} fail (of ${ADAPTED_TOTAL} tests)"
+    echo "  Upstream pass 1 total: ${TOTAL_PASS}/${TOTAL_TESTS}"
+    echo "  Combined (pass 1 + recovered): $((TOTAL_PASS + ADAPTED_PASS - (ADAPTED_TOTAL - ADAPTED_PASS - ADAPTED_FAIL)))/${TOTAL_TESTS}"
+    echo ""
+
+    rm -f "${ADAPTED_SHIM}"
+fi

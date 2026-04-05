@@ -10,7 +10,7 @@ The snap packages _Podman_ alongside its required runtime dependencies. No upstr
 | `crun` | 1.19.1 | GNU GPL v2 or later | `GPL-2.0-or-later` | [containers/crun](https://github.com/containers/crun) | Built from source (unmodified) |
 | `netavark` | 1.14.1 | Apache License 2.0 | `Apache-2.0` | [containers/netavark](https://github.com/containers/netavark) | Pre-built binary from GitHub Releases |
 | `aardvark-dns` | 1.14.0 | Apache License 2.0 | `Apache-2.0` | [containers/aardvark-dns](https://github.com/containers/aardvark-dns) | Pre-built binary from GitHub Releases |
-| `conmon` | Ubuntu 22.04 | Apache License 2.0 | `Apache-2.0` | [containers/conmon](https://github.com/containers/conmon) | Ubuntu package via `stage-packages` |
+| `conmon` | 2.0.26 | Apache License 2.0 | `Apache-2.0` | [containers/conmon](https://github.com/containers/conmon) | Built from source (unmodified) — upgraded from Ubuntu 22.04's v2.0.25 to fix stderr data loss ([conmon#236](https://github.com/containers/conmon/issues/236)) |
 | `slirp4netns` | Ubuntu 22.04 | GNU GPL v2 | `GPL-2.0-only` | [rootless-containers/slirp4netns](https://github.com/rootless-containers/slirp4netns) | Ubuntu package via `stage-packages` |
 | `fuse-overlayfs` | Ubuntu 22.04 | GNU GPL v2 or later | `GPL-2.0-or-later` | [containers/fuse-overlayfs](https://github.com/containers/fuse-overlayfs) | Ubuntu package via `stage-packages` |
 | `catatonit` | Ubuntu 22.04 | GNU GPL v2 | `GPL-2.0-only` | [openSUSE/catatonit](https://github.com/openSUSE/catatonit) | Ubuntu package via `stage-packages` |
