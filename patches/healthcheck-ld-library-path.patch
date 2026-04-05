@@ -1,0 +1,13 @@
+--- a/libpod/healthcheck_linux.go
++++ b/libpod/healthcheck_linux.go
+@@ -36,6 +36,10 @@
+ 	if path != "" {
+ 		cmd = append(cmd, "--setenv=PATH="+path)
+ 	}
++	ldLibPath := os.Getenv("LD_LIBRARY_PATH")
++	if ldLibPath != "" {
++		cmd = append(cmd, "--setenv=LD_LIBRARY_PATH="+ldLibPath)
++	}
+
+ 	// StartLimitIntervalSec=0 so we don't hit the restart limit
+ 	cmd = append(cmd, "--unit", hcUnitName, fmt.Sprintf("--on-unit-inactive=%s", interval), "--timer-property=AccuracySec=1s", "--property=StartLimitIntervalSec=0", podman)

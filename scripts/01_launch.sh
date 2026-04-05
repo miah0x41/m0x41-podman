@@ -51,6 +51,11 @@ for wrapper in podman-wrapper conmon-wrapper crun-wrapper; do
 done
 lxc exec "${CONTAINER_NAME}" -- chmod +x /root/snap-build/scripts/podman-wrapper /root/snap-build/scripts/conmon-wrapper /root/snap-build/scripts/crun-wrapper
 
+lxc exec "${CONTAINER_NAME}" -- mkdir -p /root/snap-build/patches
+for f in "${PROJECT_DIR}"/patches/*.patch; do
+    [ -f "${f}" ] && lxc file push "${f}" "${CONTAINER_NAME}/root/snap-build/patches/$(basename "${f}")"
+done
+
 lxc exec "${CONTAINER_NAME}" -- mkdir -p /root/snap-build/snap/hooks
 for f in install remove; do
     lxc file push "${PROJECT_DIR}/snap/hooks/${f}" "${CONTAINER_NAME}/root/snap-build/snap/hooks/${f}"
