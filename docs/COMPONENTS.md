@@ -42,7 +42,7 @@ One patch is applied to the _Podman_ source at build time. The patch file is at 
 |-------|------|--------|-----|
 | `healthcheck-ld-library-path.patch` | `libpod/healthcheck_linux.go` | Propagate `LD_LIBRARY_PATH` via `--setenv` when creating transient systemd healthcheck units | _Podman_ embeds its own binary path (via `/proc/self/exe`) in transient systemd units for container healthchecks. In the snap, this resolves to the raw binary inside the snap filesystem, bypassing the shim's `LD_LIBRARY_PATH` setup. Without the patch, healthcheck timers fail with `libgpgme.so.11: cannot open shared object file`. The patch adds three lines that mirror the existing `PATH` propagation, passing `LD_LIBRARY_PATH` to the transient unit via `systemd-run --setenv`. |
 
-The patch follows the existing upstream code pattern (identical to how `PATH` is already propagated) and has no effect when `LD_LIBRARY_PATH` is unset. See [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) for the full root cause analysis and solution evaluation.
+The patch follows the existing upstream code pattern (identical to how `PATH` is already propagated) and has no effect when `LD_LIBRARY_PATH` is unset. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis and solution evaluation.
 
 All other components (`crun`, `netavark`, `aardvark-dns`, `conmon`, etc.) are unmodified.
 
