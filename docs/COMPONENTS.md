@@ -1,12 +1,12 @@
 # Bundled Components
 
-The snap packages _Podman_ alongside its required runtime dependencies. No upstream source code is modified — components are either built from unmodified source or included as unmodified pre-built binaries.
+The snap packages _Podman_ alongside its required runtime dependencies. Components are either built from source or included as pre-built binaries. One upstream source modification is applied — see [Source Modifications](#source-modifications) below.
 
 ## Component Table
 
 | Component | Version | License | SPDX | Upstream | How Bundled |
 |-----------|---------|---------|------|----------|-------------|
-| _Podman_ | v5.8.1 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source (unmodified) |
+| _Podman_ | v5.8.1 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source ([one patch](#source-modifications)) |
 | `crun` | 1.19.1 | GNU GPL v2 or later | `GPL-2.0-or-later` | [containers/crun](https://github.com/containers/crun) | Built from source (unmodified) |
 | `netavark` | 1.14.1 | Apache License 2.0 | `Apache-2.0` | [containers/netavark](https://github.com/containers/netavark) | Pre-built binary from GitHub Releases |
 | `aardvark-dns` | 1.14.0 | Apache License 2.0 | `Apache-2.0` | [containers/aardvark-dns](https://github.com/containers/aardvark-dns) | Pre-built binary from GitHub Releases |
@@ -34,11 +34,23 @@ The snap packages _Podman_ alongside its required runtime dependencies. No upstr
 | **`fuse-overlayfs`** | Rootless storage — overlay filesystem in userspace for rootless containers |
 | **`catatonit`** | Minimal init — PID 1 process for pods |
 
+## Source Modifications
+
+One patch is applied to the _Podman_ source at build time. The patch file is at `patches/healthcheck-ld-library-path.patch` and is applied in the `override-build` step of `snapcraft.yaml`.
+
+| Patch | File | Change | Why |
+|-------|------|--------|-----|
+| `healthcheck-ld-library-path.patch` | `libpod/healthcheck_linux.go` | Propagate `LD_LIBRARY_PATH` via `--setenv` when creating transient systemd healthcheck units | _Podman_ embeds its own binary path (via `/proc/self/exe`) in transient systemd units for container healthchecks. In the snap, this resolves to the raw binary inside the snap filesystem, bypassing the shim's `LD_LIBRARY_PATH` setup. Without the patch, healthcheck timers fail with `libgpgme.so.11: cannot open shared object file`. The patch adds three lines that mirror the existing `PATH` propagation, passing `LD_LIBRARY_PATH` to the transient unit via `systemd-run --setenv`. |
+
+The patch follows the existing upstream code pattern (identical to how `PATH` is already propagated) and has no effect when `LD_LIBRARY_PATH` is unset. See [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) for the full root cause analysis and solution evaluation.
+
+All other components (`crun`, `netavark`, `aardvark-dns`, `conmon`, etc.) are unmodified.
+
 ## Source Code Availability
 
 This snap distributes GPL-licensed binaries. In accordance with the GNU GPL, source code for all GPL-licensed components is available from their upstream repositories linked above, at the exact versions listed in the component table.
 
-The `snapcraft.yaml` at the root of this repository contains the complete build instructions, including the exact source tags, download URLs, and build commands used to produce the snap. Anyone can reproduce the build by running `snapcraft` with this file.
+The `snapcraft.yaml` at the root of this repository contains the complete build instructions, including the exact source tags, download URLs, build commands, and patches used to produce the snap. Anyone can reproduce the build by running `snapcraft` with this file.
 
 ## Licensing of This Repository
 

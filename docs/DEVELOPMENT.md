@@ -27,21 +27,23 @@ This takes approximately 15-20 minutes. The output is a `.snap` file in the proj
    - Downloads and stages `Go` 1.24.2 (build-time only, excluded from the snap)
    - Clones and builds `crun` 1.19.1 from source
    - Downloads pre-built `netavark` v1.14.1 and `aardvark-dns` v1.14.0 binaries
-   - Clones and builds _Podman_ v5.8.1 from source
-   - Stages Ubuntu 22.04 packages: `conmon`, `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables`
+   - Clones _Podman_ v5.8.1 from source, applies the healthcheck patch, and builds
+   - Builds `conmon` 2.0.26 from source
+   - Stages Ubuntu 22.04 packages: `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables`
    - Bundles configuration files and the wrapper script
 4. The `.snap` file is pulled back to the host
 
 ### `snapcraft.yaml` Overview
 
-The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as the base and classic confinement. It has six parts:
+The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as the base and classic confinement. It has seven parts:
 
 | Part | Plugin | What It Does |
 |------|--------|-------------|
 | `go` | nil | Downloads `Go` 1.24.2. Excluded from the final snap (`prime: [-*]`) — build-time only |
 | `crun` | nil | Clones `crun` 1.19.1, runs `./autogen.sh && ./configure && make && make install` |
+| `conmon` | nil | Downloads and builds `conmon` 2.0.26 from source — upgraded from Ubuntu 22.04's v2.0.25 to fix stderr data loss |
 | `netavark` | nil | Downloads pre-built `netavark` and `aardvark-dns` binaries from GitHub Releases |
-| `podman` | nil | Clones _Podman_ v5.8.1, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
+| `podman` | nil | Clones _Podman_ v5.8.1, applies `patches/healthcheck-ld-library-path.patch`, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
 | `configs` | dump | Copies `containers.conf`, `storage.conf`, `registries.conf`, `policy.json` into the snap |
 | `wrapper` | dump | Copies wrapper scripts (`podman-wrapper`, `conmon-wrapper`, `crun-wrapper`) that set `PATH` and `LD_LIBRARY_PATH` |
 
@@ -111,6 +113,12 @@ _Podman_ v5.8.1 defaults to `pasta` for rootless networking, but `passt` was add
 ### `LD_LIBRARY_PATH` Does Not Propagate Through `conmon` → `crun`
 
 The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmon`, which then spawns `crun`, the library path is lost. The snap bundles `libyajl` (required by `crun`), but `crun` can't find it at runtime. Fix: `containers.conf` points at `conmon-wrapper` and `crun-wrapper` scripts that set `LD_LIBRARY_PATH` before exec'ing the real binaries. This scopes library resolution to the snap's own processes without affecting the host.
+
+### `LD_LIBRARY_PATH` Not Propagated to Healthcheck Transient Units
+
+_Podman_ creates transient systemd timer and service units for container healthchecks. It reads `/proc/self/exe` to determine its own binary path and embeds that in the transient unit's `ExecStart`. After the shim `exec()`s the real binary, `/proc/self/exe` resolves to the raw snap path — bypassing the shim's `LD_LIBRARY_PATH` setup. There is no upstream configuration option or environment variable to override this path.
+
+Fix: a 3-line patch (`patches/healthcheck-ld-library-path.patch`) to `libpod/healthcheck_linux.go` that propagates `LD_LIBRARY_PATH` via `systemd-run --setenv`, mirroring the existing `PATH` propagation. This is the only upstream source modification in the snap. See [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) for the full root cause analysis, including why alternative approaches (`ldconfig`, compiled wrapper, user environment generator, transient unit monitor) were rejected. See [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md) for the security analysis.
 
 ### `uidmap` and `dbus-user-session` Required on Host for Rootless
 
