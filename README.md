@@ -143,9 +143,10 @@ The snap bundles _Podman_ and all its runtime dependencies so that no additional
 |-----------|---------|--------|
 | `Podman` (with `quadlet`) | v5.8.1 | Built from source |
 | `crun` | 1.19.1 | Built from source |
+| `conmon` | 2.0.26 | Built from source |
 | `netavark` | 1.14.1 | Pre-built binary |
 | `aardvark-dns` | 1.14.0 | Pre-built binary |
-| `conmon`, `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables` | Ubuntu 22.04 | Packaged binaries |
+| `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables` | Ubuntu 22.04 | Packaged binaries |
 
 The snap's install hook automatically:
 - Creates `/usr/local/bin/podman` (so `podman` is on PATH without aliasing)
@@ -166,7 +167,7 @@ This creates an LXD container, builds the snap with `snapcraft --destructive-mod
 
 ## Testing
 
-The snap is validated with a five-tier test suite covering command validation, rootless and rootful functional tests, upstream BATS parity, and Quadlet/install hook validation. All tiers run automatically in LXD containers across five distributions.
+The snap is validated with a seven-tier test suite covering command validation, rootless and rootful functional tests, upstream BATS parity, Quadlet/install hook validation, host-side impact, and the full upstream BATS suite. Tiers 1-5 form the core regression suite. Tier 6 requires a VM. Tier 7 is on-demand.
 
 | Tier | Tests | What It Validates |
 |------|-------|-------------------|
@@ -174,9 +175,11 @@ The snap is validated with a five-tier test suite covering command validation, r
 | 2 | 8 | Rootless: pull, run, build, pod, volume, DNS |
 | 3 | 6 | Rootful: run, build, pod, volume |
 | 4 | 31 | Upstream BATS smoke tests |
-| 5 | 18+ | Install hook artefacts (including socket units), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests, Go e2e quadlet tests |
+| 5 | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet, upstream BATS system-service/socket-activation/quadlet tests, healthcheck transient unit validation |
+| 6 | 25+ | Network integrity, library path poisoning, systemd health, reboot survival, snap removal cleanup (VM only) |
+| 7 | 785 | Full upstream BATS suite in root and rootless modes (on-demand) |
 
-The full upstream BATS suite (78 files, 785 tests) can also be run against the snap. In a VM, the upstream pass yields 559/785 (71%) with 180 skipped and 46 failures. A second adapted pass — where the shim respects pre-existing config env vars — recovers 5 more, for a combined 564/785 (72%). The 41 residual failures are snap-specific (22 structural, 5 config override), missing infrastructure (11), or timing/test-infra issues (3). See [docs/TESTING.md](docs/TESTING.md) for the methodology and [docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md) for the full categorised results, multi-distro tables, and known failures.
+The full upstream BATS suite (78 files, 785 tests) can also be run against the snap. Of those, 180 are skipped by the test harness — tests for `pasta` networking (the snap bundles `slirp4netns` instead), SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **605 applicable tests** that run in root mode, **559 pass (92%)**. A second adapted pass — where the shim respects pre-existing config env vars — recovers 5 more, for **564/605 (93%)**. The 41 residual failures are snap-specific: config env var override (22 structural, 5 recoverable), missing infrastructure (11), and timing (3). In rootless mode, the same `pasta` tests that skip in root mode instead fail (91 tests), inflating the raw failure count. Excluding these, rootless passes **511/611 applicable tests (84%)**. See [docs/TEST-FAILURES.md](docs/TEST-FAILURES.md) for the full per-tier breakdown, [docs/TESTING.md](docs/TESTING.md) for the methodology, and [docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md) for recorded results.
 
 ## Why Classic Confinement?
 
@@ -196,6 +199,7 @@ docs/
   DEVELOPMENT.md                # Build environment and script reference
   TESTING.md                    # Test methodology: tiers, how to run tests
   TESTING-RESULTS.md            # Recorded test results, known failures, BATS suite
+  TEST-FAILURES.md              # All known failures by tier and environment (LXC vs VM)
   COMPONENTS.md                 # Upstream components, versions, and licenses
   WRAPPER.md                    # Wrapper script behaviour, messages, and testing
   QUADLET.md                    # Quadlet (systemd integration) and install hooks
@@ -203,6 +207,7 @@ docs/
   investigations/               # Root cause analyses and security reviews
     RCCA-BATS-FAILURES.md       # BATS test failure root cause analysis
     RCCA-ADAPTED-FAILURES.md    # Adapted pass residual failure analysis
+    RCCA-LIBRARY-POISONING.md   # Snap library path poisoning of host systemd services
     HEALTHCHECK_ISSUES.md       # Healthcheck transient unit issue
     PATCH_SECURITY_REVIEW.md    # Security review of healthcheck patch
 ```
@@ -211,11 +216,12 @@ docs/
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment, prerequisites, script reference, architecture diagram
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests
 - **[docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md)** — Recorded results, known failures, full upstream BATS suite analysis
+- **[docs/TEST-FAILURES.md](docs/TEST-FAILURES.md)** — All known failures by tier and environment (LXC vs VM)
 - **[docs/COMPONENTS.md](docs/COMPONENTS.md)** — Upstream components, licenses, and source availability
 - **[docs/WRAPPER.md](docs/WRAPPER.md)** — Wrapper behaviour, first-run messages, dependency detection
 - **[docs/QUADLET.md](docs/QUADLET.md)** — Quadlet support, install/remove hooks, shim vs wrapper
 - **[docs/CLASSIC_CONFINEMENT.md](docs/CLASSIC_CONFINEMENT.md)** — Classic confinement rationale and interface evaluation
-- **[docs/investigations/](docs/investigations/)** — Root cause analyses (BATS failures, adapted pass, healthcheck issue, patch security review)
+- **[docs/investigations/](docs/investigations/)** — Root cause analyses (BATS failures, adapted pass, library path poisoning, healthcheck issue, patch security review)
 
 ## Acknowledgements
 
