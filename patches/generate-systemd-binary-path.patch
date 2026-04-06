@@ -1,0 +1,26 @@
+--- a/pkg/systemd/generate/containers.go
++++ b/pkg/systemd/generate/containers.go
+@@ -300,6 +300,10 @@
+ 		if err != nil {
+ 			executable = "/usr/bin/podman"
+ 			logrus.Warnf("Could not obtain podman executable location, using default %s", executable)
+ 		}
++		// Allow snap/wrapper environments to override the resolved binary path.
++		if override := os.Getenv("PODMAN_BINARY"); override != "" {
++			executable = override
++		}
+ 		info.Executable = executable
+ 	}
+--- a/pkg/systemd/generate/pods.go
++++ b/pkg/systemd/generate/pods.go
+@@ -285,6 +285,10 @@
+ 		if err != nil {
+ 			executable = "/usr/bin/podman"
+ 			logrus.Warnf("Could not obtain podman executable location, using default %s: %v", executable, err)
+ 		}
++		// Allow snap/wrapper environments to override the resolved binary path.
++		if override := os.Getenv("PODMAN_BINARY"); override != "" {
++			executable = override
++		}
+ 		info.Executable = executable
+ 	}
