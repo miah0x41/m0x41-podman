@@ -83,13 +83,13 @@ All scripts are in the `scripts/` directory.
 | `03_test_launch.sh` | Host | Creates an Ubuntu 24.04 test container, pushes the snap + test scripts, runs setup and tests |
 | `03_test_launch_vm.sh` | Host | Same as above but launches an LXD VM instead of a container |
 | `04_test_setup.sh` | Test container | Installs the snap, verifies install hook artefacts, creates a test user, installs `Go`/`BATS`/_Podman_ source for tiers 4-5 |
-| `05_run_tests.sh` | Test container | Five-tier test runner. Accepts `tier1`..`tier5` or `all` |
+| `05_run_tests.sh` | Test container | Seven-tier test runner. Accepts `tier1`..`tier7`, `tier6_removal`, or `all` |
 | `06_test_multi_distro.sh` | Host | Launches five distro containers in parallel, pushes the snap to each, runs tiers 1-3 and 5 on all, prints a summary table |
 | `07_test_setup_multi.sh` | Test container | Distro-agnostic setup — detects the distro, installs `snapd` and prerequisites, installs the snap, creates the test user. Handles Ubuntu, Debian, Fedora, and CentOS/RHEL |
 | `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
 | `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
-| `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, ~780 tests) with categorised failure classification. Accepts `root` or `rootless` |
+| `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, 785 tests) with categorised failure classification. Accepts `root` or `rootless` |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
 | `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, installs corrected systemd units, symlinks man pages, installs `policy.json`, detects stale native podman artefacts. See [QUADLET.md](QUADLET.md) |
 | `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, systemd units, and man page symlinks; warns about active Quadlet services |

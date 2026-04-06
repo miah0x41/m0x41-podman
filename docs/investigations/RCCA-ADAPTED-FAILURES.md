@@ -55,13 +55,13 @@ Option 2 is not appropriate — `/usr/bin/podman` is the native package path and
 
 ### Corrective Action
 
-**Accept as known limitation.** `podman generate systemd` is deprecated in favour of Quadlet. The snap's Quadlet integration works correctly (tier 5 confirms this). Users should use Quadlet for systemd integration, not `podman generate systemd`.
+**Fixed.** The `PODMAN_BINARY` patch overrides `os.Executable()` so that generated units reference `/usr/local/bin/podman` (the shim) instead of the snap internal path. Verified 2026-04-06: `250-systemd.bats` 16/16, `255-auto-update.bats` 12/12. See [RCCA-GENERATE-SYSTEMD.md](RCCA-GENERATE-SYSTEMD.md) for the full analysis.
 
-Document in user guidance that `podman generate systemd` output must be manually edited to replace the snap binary path with `/usr/local/bin/podman` (the shim) if users need this deprecated workflow.
+`podman generate systemd` remains deprecated upstream — Quadlet is the recommended path.
 
 ### Priority
 
-Low. Deprecated feature. Quadlet is the replacement and works.
+Fixed.
 
 ---
 
@@ -117,15 +117,15 @@ But the actual output contains the resolved snap path:
 command: /snap/m0x41-podman/current/usr/bin/podman run -t -i --rm ...
 ```
 
-Same root cause as Category 1 — _Podman_ resolves its own binary path at runtime and embeds the real path, not the shim/wrapper path.
+Same root cause class as Category 1, but a different code path. The `--display` branch (line 73 of `containers_runlabel.go`) bypasses `substituteCommand()` entirely and uses `os.Args[0]` directly — the kernel-resolved snap internal path.
 
 ### Corrective Action
 
-**Accept as known.** The `runlabel` feature works functionally — it just reports the internal snap path rather than the shim. This is cosmetic in `--display` mode, but would be a real issue if `runlabel` is executed (the generated command would run outside the snap's environment).
+**Fixed.** The `PODMAN_BINARY` patch overrides `os.Args[0]` in the display branch so that the output shows `/usr/local/bin/podman` (the shim). Verified 2026-04-06: `037-runlabel.bats` 1/1. See [RCCA-GENERATE-SYSTEMD.md](RCCA-GENERATE-SYSTEMD.md).
 
 ### Priority
 
-Low. `runlabel` is rarely used and primarily a CRI-O/OpenShift feature.
+Fixed.
 
 ---
 
@@ -171,20 +171,20 @@ The `podman-auto-update --authfile` test fails because `skopeo copy` to the loca
 
 ## Summary
 
-| Category | Failures | Actionable? | Action |
-|----------|----------|-------------|--------|
-| Generated units embed snap path | 15 | No | `podman generate systemd` is deprecated; use Quadlet |
-| Quadlet with adapted shim | 2 | No | Test artefact — passes with production shim |
-| `runlabel` embeds snap path | 1 | No | Cosmetic; rarely used feature |
-| `dd` output capture | 1 | Yes | Investigate `conmon-wrapper` stderr buffering |
-| Infra/structural | 3 | Partially | Registry cleanup between test files |
-| **Total** | **22** | | |
+| Category | Failures | Status | Action |
+|----------|----------|--------|--------|
+| Generated units embed snap path | 15 | Fixed | `PODMAN_BINARY` patch — units now reference shim |
+| Quadlet with adapted shim | 2 | N/A | Test artefact — passes with production shim |
+| `runlabel` embeds snap path | 1 | Fixed | `PODMAN_BINARY` patch — display output now shows shim |
+| `dd` output capture | 1 | Fixed | `conmon` upgraded to v2.0.26 |
+| Infra/structural | 3 | Partial | Registry cleanup between test files |
+| **Total** | **22** | **17 fixed** | |
 
 ### Key Finding
 
-**18 of 22 adapted-pass failures share the same root cause**: _Podman_ resolves its own binary path at runtime (`/proc/self/exe` or equivalent) and embeds it in generated outputs (systemd units, runlabel commands). In a snap, this resolves to `/snap/m0x41-podman/x1/usr/bin/podman` — a path that only works inside the snap's wrapper environment. When systemd or other tools invoke this path directly, they lack `LD_LIBRARY_PATH`, `PATH`, and config env vars.
+**18 of 22 adapted-pass failures shared the same root cause**: _Podman_ resolves its own binary path at runtime (`os.Executable()`, `os.Args[0]`, `/proc/self/exe`) and embeds it in generated outputs (systemd units, runlabel commands). In a snap, these resolve to `/snap/m0x41-podman/x1/usr/bin/podman` — a path that only works inside the snap's wrapper environment.
 
-This is a fundamental characteristic of how _Podman_ discovers itself, not a configuration issue. The snap's Quadlet integration solves this correctly by having the generators reference `/usr/local/bin/podman` (the shim). The deprecated `podman generate systemd` path cannot be fixed without upstream changes.
+The `PODMAN_BINARY` environment variable patch resolves 16 of these 18 failures (15 from `generate systemd` + 1 from `runlabel`). The remaining 2 are adapted shim test artefacts that pass with the production shim. Combined with the `conmon` v2.0.26 upgrade (1 failure), **17 of 22 adapted-pass failures are now fixed**. The remaining 5 are infrastructure/structural issues (registry state leakage, test tooling).
 
 ### Test Results in Context
 

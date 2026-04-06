@@ -169,8 +169,10 @@ parts:
     override-build: |
       export PATH=$CRAFT_STAGE/usr/local/go/bin:$PATH
       export GOPATH=$(mktemp -d)
-      # Propagate LD_LIBRARY_PATH in healthcheck transient units (see docs/HEALTHCHECK_ISSUES.md)
+      # Propagate LD_LIBRARY_PATH in healthcheck transient units (see docs/investigations/HEALTHCHECK_ISSUES.md)
       patch -p1 < $CRAFT_PROJECT_DIR/patches/healthcheck-ld-library-path.patch
+      # Override binary path in generated systemd units (see docs/investigations/RCCA-GENERATE-SYSTEMD.md)
+      patch -p1 < $CRAFT_PROJECT_DIR/patches/generate-systemd-binary-path.patch
       make podman podman-remote rootlessport quadlet -j$(nproc)
       make docs || true
       make install.bin PREFIX=/usr DESTDIR=$CRAFT_PART_INSTALL

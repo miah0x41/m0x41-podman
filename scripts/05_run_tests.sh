@@ -563,12 +563,17 @@ CEOF
         fail "rootful healthcheck container failed to start"
     fi
 
-    # Give systemd-run a moment to register the transient timer.
-    sleep 2
-
     echo "--- rootful healthcheck: transient timer exists ---"
     HC_CONTAINER_ID=$(${PODMAN} inspect --format '{{.Id}}' "${HC_NAME}" 2>/dev/null) || true
-    if [ -n "${HC_CONTAINER_ID}" ] && systemctl list-units --type=timer --no-pager 2>/dev/null | grep -q "${HC_CONTAINER_ID:0:12}"; then
+    HC_TIMER_FOUND=false
+    for _i in $(seq 1 10); do
+        if [ -n "${HC_CONTAINER_ID}" ] && systemctl list-units --type=timer --no-pager 2>/dev/null | grep -q "${HC_CONTAINER_ID:0:12}"; then
+            HC_TIMER_FOUND=true
+            break
+        fi
+        sleep 1
+    done
+    if ${HC_TIMER_FOUND}; then
         pass "rootful healthcheck transient timer exists"
     else
         fail "rootful healthcheck transient timer not found"
@@ -609,11 +614,17 @@ CEOF
         fail "rootless healthcheck container failed to start"
     fi
 
-    sleep 2
-
     echo "--- rootless healthcheck: transient timer exists ---"
     HC_RL_ID=$(run_as_testuser "${PODMAN} inspect --format '{{.Id}}' ${HC_NAME_RL}" 2>/dev/null) || true
-    if [ -n "${HC_RL_ID}" ] && run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep -q "${HC_RL_ID:0:12}"; then
+    HC_RL_TIMER_FOUND=false
+    for _i in $(seq 1 10); do
+        if [ -n "${HC_RL_ID}" ] && run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep -q "${HC_RL_ID:0:12}"; then
+            HC_RL_TIMER_FOUND=true
+            break
+        fi
+        sleep 1
+    done
+    if ${HC_RL_TIMER_FOUND}; then
         pass "rootless healthcheck transient timer exists"
     else
         fail "rootless healthcheck transient timer not found"
