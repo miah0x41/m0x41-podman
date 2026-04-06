@@ -13,7 +13,7 @@ The snap is validated with a seven-tier test suite. Tiers 1-5 form the core regr
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
 | 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.1 source tree, with `PODMAN` pointed at the snap binary |
 | 5 | Quadlet / Install Hook | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), Go e2e quadlet tests (gated) |
-| 6 | Host-Side Impact (VM) | 25+ | Network integrity, library path poisoning, systemd health, reboot survival, snap removal cleanup — requires full VM |
+| 6 | Host-Side Impact (VM) | 25+ | Network integrity, [library path poisoning](investigations/RCCA-LIBRARY-POISONING.md), systemd health, reboot survival, snap removal cleanup — requires full VM |
 | 7 | Full Upstream BATS (on-demand) | 785 | All upstream `test/system/*.bats` files in both root and rootless modes, with categorised failure classification |
 
 All tests in tiers 1-3 run through `snap run m0x41-podman` — the snap's actual entry point, not a bypass of the binary. Tier 5 tests the `/usr/local/bin/podman` shim created by the install hook. Tier 6 requires a VM (full kernel isolation) because it validates host-level side effects that cannot be observed in a nested container. Tier 7 is excluded from `all` due to its runtime (~2 hours).

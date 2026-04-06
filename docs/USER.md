@@ -267,7 +267,7 @@ If you are replacing a distribution-packaged _Podman_ (e.g. `apt install podman`
 
 - **Enablement symlinks** at `/etc/systemd/system/*.target.wants/podman*` point to unit files that no longer exist after removal. systemd logs warnings for each dangling symlink at every boot and `daemon-reload`.
 - **`/etc/containers/`** retains `libpod.conf`, `registries.conf`, and `policy.json` from the native package. These are harmless (the snap uses its own config via environment variables) but clutter the filesystem.
-- **`/etc/ld.so.conf.d/podman-snap.conf`** may exist from a previous snap revision that registered snap library paths system-wide. This is no longer needed and should be deleted.
+- **`/etc/ld.so.conf.d/podman-snap.conf`** may exist from a previous snap revision that registered snap library paths system-wide. This caused `systemd-networkd` and `systemd-resolved` to crash with SIGSEGV by loading the snap's incompatible `libseccomp` — see [RCCA-LIBRARY-POISONING.md](investigations/RCCA-LIBRARY-POISONING.md). It is no longer needed and should be deleted.
 
 ### Recommended: Purge Before Installing the Snap
 
