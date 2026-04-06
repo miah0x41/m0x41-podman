@@ -1,12 +1,12 @@
 # Bundled Components
 
-The snap packages _Podman_ alongside its required runtime dependencies. Components are either built from source or included as pre-built binaries. One upstream source modification is applied — see [Source Modifications](#source-modifications) below.
+The snap packages _Podman_ alongside its required runtime dependencies. Components are either built from source or included as pre-built binaries. Two upstream source modifications are applied — see [Source Modifications](#source-modifications) below.
 
 ## Component Table
 
 | Component | Version | License | SPDX | Upstream | How Bundled |
 |-----------|---------|---------|------|----------|-------------|
-| _Podman_ | v5.8.1 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source ([one patch](#source-modifications)) |
+| _Podman_ | v5.8.1 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source ([two patches](#source-modifications)) |
 | `crun` | 1.19.1 | GNU GPL v2 or later | `GPL-2.0-or-later` | [containers/crun](https://github.com/containers/crun) | Built from source (unmodified) |
 | `netavark` | 1.14.1 | Apache License 2.0 | `Apache-2.0` | [containers/netavark](https://github.com/containers/netavark) | Pre-built binary from GitHub Releases |
 | `aardvark-dns` | 1.14.0 | Apache License 2.0 | `Apache-2.0` | [containers/aardvark-dns](https://github.com/containers/aardvark-dns) | Pre-built binary from GitHub Releases |
@@ -36,13 +36,16 @@ The snap packages _Podman_ alongside its required runtime dependencies. Componen
 
 ## Source Modifications
 
-One patch is applied to the _Podman_ source at build time. The patch file is at `patches/healthcheck-ld-library-path.patch` and is applied in the `override-build` step of `snapcraft.yaml`.
+Two patches are applied to the _Podman_ source at build time. Both patch files are in the `patches/` directory and are applied in the `override-build` step of `snapcraft.yaml`.
 
-| Patch | File | Change | Why |
-|-------|------|--------|-----|
+| Patch | Files | Change | Why |
+|-------|-------|--------|-----|
 | `healthcheck-ld-library-path.patch` | `libpod/healthcheck_linux.go` | Propagate `LD_LIBRARY_PATH` via `--setenv` when creating transient systemd healthcheck units | _Podman_ embeds its own binary path (via `/proc/self/exe`) in transient systemd units for container healthchecks. In the snap, this resolves to the raw binary inside the snap filesystem, bypassing the shim's `LD_LIBRARY_PATH` setup. Without the patch, healthcheck timers fail with `libgpgme.so.11: cannot open shared object file`. The patch adds three lines that mirror the existing `PATH` propagation, passing `LD_LIBRARY_PATH` to the transient unit via `systemd-run --setenv`. |
+| `generate-systemd-binary-path.patch` | `pkg/systemd/generate/containers.go`, `pkg/systemd/generate/pods.go`, `pkg/domain/infra/abi/containers_runlabel.go` | Check `PODMAN_BINARY` env var and override the resolved binary path in text output | _Podman_ resolves its own binary path via `os.Executable()` and `os.Args[0]` and embeds it in `podman generate systemd` output and `runlabel --display` output. In the snap, this resolves to the raw binary inside the snap filesystem. The patch allows the wrapper/shim to set the shim path via `PODMAN_BINARY`, so generated units and display output reference `/usr/local/bin/podman`. |
 
-The patch follows the existing upstream code pattern (identical to how `PATH` is already propagated) and has no effect when `LD_LIBRARY_PATH` is unset. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis and solution evaluation.
+The healthcheck patch follows the existing upstream code pattern (identical to how `PATH` is already propagated) and has no effect when `LD_LIBRARY_PATH` is unset. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis and [PATCH_SECURITY_REVIEW.md](investigations/PATCH_SECURITY_REVIEW.md) for the security review.
+
+The binary path patch affects text output only — it does not change which binary is executed. See [RCCA-GENERATE-SYSTEMD.md](investigations/RCCA-GENERATE-SYSTEMD.md) for the root cause analysis and [PATCH_SECURITY_REVIEW_BINARY_PATH.md](investigations/PATCH_SECURITY_REVIEW_BINARY_PATH.md) for the security review.
 
 All other components (`crun`, `netavark`, `aardvark-dns`, `conmon`, etc.) are unmodified.
 

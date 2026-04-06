@@ -171,9 +171,9 @@ Both entry points set identical core environment. The only difference is the use
 
 Quadlet (`.container`, `.volume`, `.network`, `.kube` files) is fully supported. The install hook registers systemd generators so that Quadlet works immediately after installation. See [QUADLET.md](QUADLET.md) for details, file locations, and examples.
 
-### `podman generate systemd` Is Not Supported
+### `podman generate systemd` (Deprecated)
 
-`podman generate systemd` is deprecated upstream and hardcodes revision-specific snap paths (e.g. `/snap/m0x41-podman/x1/usr/bin/podman`) that break on every `snap refresh`. Use Quadlet `.container` files instead.
+`podman generate systemd` is deprecated upstream. The snap's `PODMAN_BINARY` patch makes it functional — generated units correctly reference `/usr/local/bin/podman` (the shim) rather than revision-specific snap paths. However, Quadlet `.container` files are the recommended approach for new deployments.
 
 ### Podman API Socket
 
@@ -324,7 +324,7 @@ When `snap refresh` runs:
 3. The wrapper's dependency marker (`.deps-ok`) is invalidated, triggering a one-time re-check
 4. Running containers are **not** migrated or restarted
 
-Any hardcoded revision paths (e.g. from `podman generate systemd` output or manual scripts referencing `/snap/m0x41-podman/x1/...`) will break. The shim and Quadlet-generated units use the `current` symlink and are unaffected.
+Any hardcoded revision paths (e.g. manual scripts referencing `/snap/m0x41-podman/x1/...`) will break. The shim, Quadlet-generated units, and `podman generate systemd` output (via the `PODMAN_BINARY` patch) all use `/usr/local/bin/podman` and are unaffected.
 
 ## Quick Reference
 
@@ -336,7 +336,7 @@ Any hardcoded revision paths (e.g. from `podman generate systemd` output or manu
 | Registry config | User-customisable | Locked to `docker.io` + `quay.io` (replaceable) |
 | Event logging | `journald` (default) | `file` (overridable) |
 | Quadlet | Supported | Supported |
-| `generate systemd` | Deprecated but works | Not supported (breaks on refresh) |
+| `generate systemd` | Deprecated but works | Deprecated but functional (`PODMAN_BINARY` patch) |
 | `podman machine` | Supported | Not supported |
 | `podman compose` | Separate install | Separate install |
 | Checkpoint/restore | Supported (with CRIU) | Not supported |

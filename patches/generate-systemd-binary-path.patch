@@ -24,3 +24,17 @@
 +		}
  		info.Executable = executable
  	}
+--- a/pkg/domain/infra/abi/containers_runlabel.go
++++ b/pkg/domain/infra/abi/containers_runlabel.go
+@@ -72,7 +72,12 @@
+
+ 	if options.Display {
+-		fmt.Printf("command: %s\n", strings.Join(append([]string{os.Args[0]}, cmd[1:]...), " "))
++		displayBin := os.Args[0]
++		// Allow snap/wrapper environments to override the resolved binary path.
++		if override := os.Getenv("PODMAN_BINARY"); override != "" {
++			displayBin = override
++		}
++		fmt.Printf("command: %s\n", strings.Join(append([]string{displayBin}, cmd[1:]...), " "))
+ 		return nil
+ 	}

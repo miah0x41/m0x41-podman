@@ -70,7 +70,7 @@ There is no override mechanism for `storage.conf` or `registries.conf`. See [doc
 
 **Rootless mode requires host packages.** `uidmap` and `dbus-user-session` cannot be bundled (they require setuid bits and a system D-Bus service). Non-Ubuntu distros also need `iptables` for rootful networking. See [Distro Compatibility](#distro-compatibility) for per-distro install commands.
 
-**Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` hardcodes snap revision paths that break on refresh — use Quadlet instead.
+**Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` is deprecated upstream — it works with the snap's `PODMAN_BINARY` patch but Quadlet is the preferred path forward.
 
 **The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, installs corrected systemd units, and symlinks man pages. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list. If a previous native _Podman_ installation is detected, the hook warns about stale artefacts and suggests cleanup — see [Replacing a Native Podman Install](docs/USER.md#replacing-a-native-podman-install).
 
@@ -99,7 +99,7 @@ Quadlet has been validated end-to-end: the snap's install hook creates a `/usr/l
 
 See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the shim vs wrapper distinction, and detailed test results.
 
-> **Note:** `podman generate systemd` is deprecated upstream and is not supported by this snap. It hardcodes revision-specific snap paths that break on refresh. Use Quadlet `.container` files instead.
+> **Note:** `podman generate systemd` is deprecated upstream. The snap's `PODMAN_BINARY` patch makes it functional (generated units correctly reference the shim), but Quadlet is the supported path forward. Use Quadlet `.container` files for new deployments.
 
 ## Distro Compatibility
 
@@ -179,7 +179,7 @@ The snap is validated with a seven-tier test suite covering command validation, 
 | 6 | 25+ | Network integrity, library path poisoning, systemd health, reboot survival, snap removal cleanup (VM only) |
 | 7 | 785 | Full upstream BATS suite in root and rootless modes (on-demand) |
 
-The full upstream BATS suite (78 files, 785 tests) can also be run against the snap. Of those, 180 are skipped by the test harness — tests for `pasta` networking (the snap bundles `slirp4netns` instead), SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **605 applicable tests** that run in root mode, **559 pass (92%)**. A second adapted pass — where the shim respects pre-existing config env vars — recovers 5 more, for **564/605 (93%)**. The 41 residual failures are snap-specific: config env var override (22 structural, 5 recoverable), missing infrastructure (11), and timing (3). In rootless mode, the same `pasta` tests that skip in root mode instead fail (91 tests), inflating the raw failure count. Excluding these, rootless passes **511/611 applicable tests (84%)**. See [docs/TEST-FAILURES.md](docs/TEST-FAILURES.md) for the full per-tier breakdown, [docs/TESTING.md](docs/TESTING.md) for the methodology, and [docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md) for recorded results.
+The full upstream BATS suite (78 files, 785 tests) can also be run against the snap. Of those, 180 are skipped by the test harness — tests for `pasta` networking (the snap bundles `slirp4netns` instead), SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **605 applicable tests** that run in root mode, **559 pass (92%)** unmodified. A second adapted pass — where the shim respects pre-existing config env vars — recovers 5 more, for **564/605 (93%)**. The `PODMAN_BINARY` patch recovers a further 16 tests (`generate systemd` and `runlabel` binary path failures), bringing the combined total to **~580/605 (~96%)**. The remaining ~25 residual failures are snap-specific: config env var override, missing infrastructure, and timing. In rootless mode, the same `pasta` tests that skip in root mode instead fail (91 tests), inflating the raw failure count. Excluding these, rootless passes **511/611 applicable tests (84%)**. See [docs/TEST-FAILURES.md](docs/TEST-FAILURES.md) for the full per-tier breakdown, [docs/TESTING.md](docs/TESTING.md) for the methodology, and [docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md) for recorded results.
 
 ## Why Classic Confinement?
 
@@ -208,8 +208,10 @@ docs/
     RCCA-BATS-FAILURES.md       # BATS test failure root cause analysis
     RCCA-ADAPTED-FAILURES.md    # Adapted pass residual failure analysis
     RCCA-LIBRARY-POISONING.md   # Snap library path poisoning of host systemd services
+    RCCA-GENERATE-SYSTEMD.md    # Generate systemd binary path resolution issue
     HEALTHCHECK_ISSUES.md       # Healthcheck transient unit issue
     PATCH_SECURITY_REVIEW.md    # Security review of healthcheck patch
+    PATCH_SECURITY_REVIEW_BINARY_PATH.md  # Security review of binary path patch
 ```
 
 - **[docs/USER.md](docs/USER.md)** — User guide: all differences from native _Podman_, configuration, limitations

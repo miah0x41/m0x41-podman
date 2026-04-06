@@ -21,6 +21,7 @@ export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gn
 export CONTAINERS_CONF="$SNAP/etc/containers/containers.conf"
 export CONTAINERS_REGISTRIES_CONF="$SNAP/etc/containers/registries.conf"
 export CONTAINERS_STORAGE_CONF="$SNAP/etc/containers/storage.conf"
+export PODMAN_BINARY="/usr/local/bin/podman"
 exec "$SNAP/usr/bin/podman" "$@"
 SHIM
 chmod +x /usr/local/bin/podman

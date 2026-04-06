@@ -43,11 +43,12 @@ The resolution chain:
 6. This path is embedded in the generated unit's `ExecStart=`
 7. systemd runs the bare snap binary → no wrapper environment → failure
 
-The same mechanism affects `podman container runlabel --display`, which embeds the resolved path in its output.
+A related but distinct mechanism affects `podman container runlabel --display`. The `--display` code path (line 73 of `containers_runlabel.go`) bypasses the `substituteCommand()` function entirely and uses `os.Args[0]` directly to print the command. After `exec()`, `os.Args[0]` resolves to the snap internal binary — the same leak, but via a different Go API.
 
 **Source locations** (Podman v5.8.1):
 - `pkg/systemd/generate/containers.go` line 301: `executable, err := os.Executable()`
 - `pkg/systemd/generate/pods.go` line 286: `executable, err := os.Executable()`
+- `pkg/domain/infra/abi/containers_runlabel.go` line 73: `os.Args[0]` (in `--display` branch)
 
 ---
 
@@ -67,7 +68,9 @@ The correct fix is to override the binary path itself so the generated unit refe
 
 ### Patch: `PODMAN_BINARY` Environment Variable Override
 
-A patch to `pkg/systemd/generate/containers.go` and `pkg/systemd/generate/pods.go` checks for a `PODMAN_BINARY` environment variable after `os.Executable()`. If set, it overrides the resolved path:
+A patch to three files checks for a `PODMAN_BINARY` environment variable and overrides the resolved binary path if set. Two distinct patterns are used.
+
+**Pattern 1 — `os.Executable()` override** (`pkg/systemd/generate/containers.go` and `pods.go`):
 
 ```go
 executable, err := os.Executable()
@@ -82,50 +85,57 @@ if override := os.Getenv("PODMAN_BINARY"); override != "" {
 info.Executable = executable
 ```
 
+**Pattern 2 — `os.Args[0]` override** (`pkg/domain/infra/abi/containers_runlabel.go`):
+
+```go
+displayBin := os.Args[0]
+// Allow snap/wrapper environments to override the resolved binary path.
+if override := os.Getenv("PODMAN_BINARY"); override != "" {
+    displayBin = override
+}
+fmt.Printf("command: %s\n", strings.Join(append([]string{displayBin}, cmd[1:]...), " "))
+```
+
+The `runlabel --display` code path requires a different pattern because it uses `os.Args[0]` directly rather than `os.Executable()`, and the display branch bypasses the `substituteCommand()` function entirely.
+
 The patch file is at `patches/generate-systemd-binary-path.patch`.
 
-### Wrapper Change
+### Wrapper and Shim Changes
 
-The wrapper (`scripts/podman-wrapper`) exports the override before exec'ing the real binary:
+Both entry points to the snap's _Podman_ binary export the override before exec'ing:
+
+The wrapper (`scripts/podman-wrapper`) and the install hook shim (`snap/hooks/install`, which writes `/usr/local/bin/podman`) both set:
 
 ```bash
 export PODMAN_BINARY="/usr/local/bin/podman"
 ```
 
-This ensures that any code path in _Podman_ that uses `os.Executable()` to embed its own path in outputs will use the shim path instead.
+Both entry points need the variable because `podman` can be invoked through either the wrapper (`snap run m0x41-podman` or snap alias) or the shim (`/usr/local/bin/podman`, used by systemd units, Quadlet services, and direct invocation).
 
 ### Properties
 
-- **Non-breaking**: Falls back to `os.Executable()` when `PODMAN_BINARY` is not set
-- **Minimal**: 4 lines per source file, 1 line in wrapper
-- **Scoped**: Only affects code paths that embed the binary path in outputs
+- **Non-breaking**: Falls back to `os.Executable()` / `os.Args[0]` when `PODMAN_BINARY` is not set
+- **Minimal**: 3-4 lines per source file, 1 line each in wrapper and shim
+- **Scoped**: Only affects code paths that embed the binary path in text outputs
 - **Consistent**: Follows the same env var override pattern as `CONTAINERS_CONF`, `CONTAINERS_STORAGE_CONF`
 
 ---
 
-## 5. Expected Impact
+## 5. Verified Impact
 
 ### Tests Recovered
 
-Of the 22 adapted-pass residual failures, 18 are caused by the embedded binary path:
+Verified 2026-04-06 on LXD VM (Ubuntu 24.04), root mode.
 
-| File | Failures | Mechanism |
-|------|----------|-----------|
-| `250-systemd.bats` | 5 | `podman generate systemd` units reference snap path |
-| `255-auto-update.bats` | 10 | Auto-update units created via `generate systemd` |
-| `037-runlabel.bats` | 1 | `podman container runlabel` embeds snap path |
-| `252-quadlet.bats` | 2 | Adapted shim test artefact (production shim already passes) |
+Of the 22 adapted-pass residual failures, 16 are directly recovered by the `PODMAN_BINARY` patch:
 
-The remaining 4 failures have other root causes (infra, registry, timing) — see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md).
+| File | Before | After | Mechanism |
+|------|--------|-------|-----------|
+| `250-systemd.bats` | 11/16 | 16/16 | `podman generate systemd` units now reference shim |
+| `255-auto-update.bats` | 2/12 | 12/12 | Auto-update units created via `generate systemd` |
+| `037-runlabel.bats` | 0/1 | 1/1 | `podman container runlabel --display` now shows shim path |
 
-### Projected Pass Rate (Root Mode)
-
-| Metric | Before | After (projected) |
-|--------|--------|--------------------|
-| Applicable tests | 605 | 605 |
-| Pass | 564 | 579-582 |
-| Fail | 41 | 23-26 |
-| Rate | 93% | 96% |
+The 2 `252-quadlet.bats` failures are adapted shim test artefacts (production shim already passes). The remaining 4 failures have other root causes (infra, registry, timing) — see [RCCA-ADAPTED-FAILURES.md](RCCA-ADAPTED-FAILURES.md).
 
 ---
 
@@ -145,8 +155,10 @@ The patch does not introduce security concerns:
 
 - `PODMAN_BINARY` only affects the text output of `podman generate systemd` and related commands
 - It does not change which binary is actually executed
-- The env var is set by the wrapper (controlled by the snap package), not by user input
+- The env var is set by the wrapper and shim (controlled by the snap package), not by user input
 - An attacker who can set environment variables can already control `PATH`, `CONTAINERS_CONF`, etc.
+
+For the full security review, see [PATCH_SECURITY_REVIEW_BINARY_PATH.md](PATCH_SECURITY_REVIEW_BINARY_PATH.md).
 
 ---
 
@@ -156,5 +168,6 @@ The patch does not introduce security concerns:
 - [RCCA-BATS-FAILURES.md](RCCA-BATS-FAILURES.md) — initial tier 7 failure classification
 - [HEALTHCHECK_ISSUES.md](HEALTHCHECK_ISSUES.md) — related issue with healthcheck transient units
 - [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md) — security review of the healthcheck patch
+- [PATCH_SECURITY_REVIEW_BINARY_PATH.md](PATCH_SECURITY_REVIEW_BINARY_PATH.md) — security review of this patch
 - `patches/generate-systemd-binary-path.patch` — the patch file
 - `patches/healthcheck-ld-library-path.patch` — the analogous healthcheck patch
