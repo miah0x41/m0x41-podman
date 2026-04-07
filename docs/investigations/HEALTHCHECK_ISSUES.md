@@ -168,11 +168,14 @@ Section 5g of `scripts/05_run_tests.sh` validates the fix for both rootful and r
 |------|-------------------|
 | Container starts with healthcheck | Basic healthcheck container lifecycle |
 | Transient timer exists | `systemd-run` created the timer unit |
+| ExecStart references shim | `PODMAN_BINARY` override redirected to `/usr/local/bin/podman` |
 | Transient service has `LD_LIBRARY_PATH` | The patch propagated the library path variable |
-| Manual healthcheck run succeeds | The healthcheck binary can find its libraries and config |
-| Status is healthy | End-to-end healthcheck is functional |
+| Transient service has `CONTAINERS_CONF` | The patch propagated container config |
+| Transient service has `CONTAINERS_REGISTRIES_CONF` | The patch propagated registries config |
+| Transient service has `CONTAINERS_STORAGE_CONF` | The patch propagated storage config |
+| Timer-triggered status is healthy | End-to-end timer-fired healthcheck is functional |
 
-All five tests run for both rootful (system scope) and rootless (user scope), totalling 10 tests.
+All eight tests run for both rootful (system scope) and rootless (user scope), totalling 16 tests. The tests use a 5-second health interval and wait for the timer-triggered healthcheck to fire — they do not use manual `podman healthcheck run`, which would go through the shim and mask the exact issues the patch addresses.
 
 ## Recommended Approach
 

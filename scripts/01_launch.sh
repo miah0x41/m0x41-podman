@@ -69,7 +69,7 @@ echo "=== Step 4: Build snap ==="
 lxc exec "${CONTAINER_NAME}" -- /root/02_build_snap.sh
 
 echo "=== Step 5: Pull built snap ==="
-SNAP_FILE=$(lxc exec "${CONTAINER_NAME}" -- find /root/snap-build -maxdepth 1 -name "*.snap" -type f | head -1)
+SNAP_FILE=$(lxc exec "${CONTAINER_NAME}" -- find /root/snap-build -maxdepth 1 -name "m0x41-podman_${SNAP_VERSION}_*.snap" -type f | head -1)
 if [ -n "${SNAP_FILE}" ]; then
     lxc file pull "${CONTAINER_NAME}${SNAP_FILE}" "${PROJECT_DIR}/"
     BASENAME=$(basename "${SNAP_FILE}")

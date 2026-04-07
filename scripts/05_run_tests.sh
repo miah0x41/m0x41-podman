@@ -547,16 +547,24 @@ CEOF
     # --- 5g: Healthcheck transient unit validation ---
     echo ""
     echo "--- 5g: Healthcheck transient unit validation ---"
+    # Tests exercise the timer-triggered path, NOT manual `podman healthcheck
+    # run` through the shim. The timer-triggered path is what the healthcheck
+    # patch fixes: systemd fires the transient unit directly, so ExecStart
+    # must reference the shim and the unit must carry LD_LIBRARY_PATH and
+    # CONTAINERS_* env vars. A manual run through the shim masks these issues
+    # because the shim sets the environment before exec'ing the binary.
 
-    # Rootful: start a container with a healthcheck, verify the transient
-    # timer propagates LD_LIBRARY_PATH and the healthcheck executes.
+    # Rootful: start a container with a short healthcheck interval, verify
+    # the transient unit configuration, and wait for the timer-triggered
+    # healthcheck to succeed.
     HC_NAME="snap-hc-test"
     echo "--- rootful healthcheck: start container ---"
     ${PODMAN} rm -f "${HC_NAME}" 2>/dev/null || true
     if ${PODMAN} run -d --name "${HC_NAME}" \
         --health-cmd "echo ok" \
-        --health-interval 60s \
+        --health-interval 5s \
         --health-start-period 0s \
+        --health-retries 1 \
         docker.io/library/alpine:latest sleep 300 2>&1; then
         pass "rootful healthcheck container started"
     else
@@ -579,27 +587,58 @@ CEOF
         fail "rootful healthcheck transient timer not found"
     fi
 
-    echo "--- rootful healthcheck: transient service has LD_LIBRARY_PATH ---"
     HC_SVC=$(systemctl list-units --type=timer --no-pager 2>/dev/null | grep "${HC_CONTAINER_ID:0:12}" | awk '{print $1}' | sed 's/\.timer$/.service/') || true
-    if [ -n "${HC_SVC}" ] && systemctl show "${HC_SVC}" --property=Environment 2>/dev/null | grep -q "LD_LIBRARY_PATH"; then
+
+    echo "--- rootful healthcheck: ExecStart references shim ---"
+    HC_EXEC=$(systemctl show "${HC_SVC}" --property=ExecStart 2>/dev/null) || true
+    if [ -n "${HC_EXEC}" ] && echo "${HC_EXEC}" | grep -q "/usr/local/bin/podman"; then
+        pass "rootful healthcheck ExecStart references shim"
+    else
+        fail "rootful healthcheck ExecStart references snap binary, not shim (${HC_EXEC})"
+    fi
+
+    echo "--- rootful healthcheck: transient service has LD_LIBRARY_PATH ---"
+    HC_ENV=$(systemctl show "${HC_SVC}" --property=Environment 2>/dev/null) || true
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "LD_LIBRARY_PATH"; then
         pass "rootful healthcheck transient service has LD_LIBRARY_PATH"
     else
         fail "rootful healthcheck transient service missing LD_LIBRARY_PATH"
     fi
 
-    echo "--- rootful healthcheck: manual run succeeds ---"
-    if ${PODMAN} healthcheck run "${HC_NAME}" 2>&1; then
-        pass "rootful healthcheck run succeeded"
+    echo "--- rootful healthcheck: transient service has CONTAINERS_CONF ---"
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_CONF="; then
+        pass "rootful healthcheck transient service has CONTAINERS_CONF"
     else
-        fail "rootful healthcheck run failed"
+        fail "rootful healthcheck transient service missing CONTAINERS_CONF"
     fi
 
-    echo "--- rootful healthcheck: status is healthy ---"
-    HC_STATUS=$(${PODMAN} inspect --format '{{.State.Health.Status}}' "${HC_NAME}" 2>/dev/null) || true
-    if [ "${HC_STATUS}" = "healthy" ]; then
-        pass "rootful healthcheck status is healthy"
+    echo "--- rootful healthcheck: transient service has CONTAINERS_REGISTRIES_CONF ---"
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_REGISTRIES_CONF="; then
+        pass "rootful healthcheck transient service has CONTAINERS_REGISTRIES_CONF"
     else
-        fail "rootful healthcheck status is '${HC_STATUS}', expected 'healthy'"
+        fail "rootful healthcheck transient service missing CONTAINERS_REGISTRIES_CONF"
+    fi
+
+    echo "--- rootful healthcheck: transient service has CONTAINERS_STORAGE_CONF ---"
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_STORAGE_CONF="; then
+        pass "rootful healthcheck transient service has CONTAINERS_STORAGE_CONF"
+    else
+        fail "rootful healthcheck transient service missing CONTAINERS_STORAGE_CONF"
+    fi
+
+    echo "--- rootful healthcheck: timer-triggered status is healthy ---"
+    HC_STATUS=""
+    for _i in $(seq 1 30); do
+        HC_STATUS=$(${PODMAN} inspect --format '{{.State.Health.Status}}' "${HC_NAME}" 2>/dev/null) || true
+        if [ "${HC_STATUS}" = "healthy" ] || [ "${HC_STATUS}" = "unhealthy" ]; then
+            break
+        fi
+        sleep 1
+    done
+    if [ "${HC_STATUS}" = "healthy" ]; then
+        pass "rootful healthcheck timer-triggered status is healthy"
+    else
+        fail "rootful healthcheck timer-triggered status is '${HC_STATUS}', expected 'healthy'"
     fi
 
     ${PODMAN} rm -f "${HC_NAME}" 2>/dev/null || true
@@ -608,7 +647,7 @@ CEOF
     HC_NAME_RL="snap-hc-test-rl"
     echo "--- rootless healthcheck: start container ---"
     run_as_testuser "${PODMAN} rm -f ${HC_NAME_RL}" 2>/dev/null || true
-    if run_as_testuser "${PODMAN} run -d --name ${HC_NAME_RL} --health-cmd 'echo ok' --health-interval 60s --health-start-period 0s docker.io/library/alpine:latest sleep 300" 2>&1; then
+    if run_as_testuser "${PODMAN} run -d --name ${HC_NAME_RL} --health-cmd 'echo ok' --health-interval 5s --health-start-period 0s --health-retries 1 docker.io/library/alpine:latest sleep 300" 2>&1; then
         pass "rootless healthcheck container started"
     else
         fail "rootless healthcheck container failed to start"
@@ -630,27 +669,58 @@ CEOF
         fail "rootless healthcheck transient timer not found"
     fi
 
-    echo "--- rootless healthcheck: transient service has LD_LIBRARY_PATH ---"
     HC_RL_SVC=$(run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep "${HC_RL_ID:0:12}" | awk '{print $1}' | sed 's/\.timer$/.service/') || true
-    if [ -n "${HC_RL_SVC}" ] && run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=Environment" 2>/dev/null | grep -q "LD_LIBRARY_PATH"; then
+
+    echo "--- rootless healthcheck: ExecStart references shim ---"
+    HC_RL_EXEC=$(run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=ExecStart" 2>/dev/null) || true
+    if [ -n "${HC_RL_EXEC}" ] && echo "${HC_RL_EXEC}" | grep -q "/usr/local/bin/podman"; then
+        pass "rootless healthcheck ExecStart references shim"
+    else
+        fail "rootless healthcheck ExecStart references snap binary, not shim (${HC_RL_EXEC})"
+    fi
+
+    echo "--- rootless healthcheck: transient service has LD_LIBRARY_PATH ---"
+    HC_RL_ENV=$(run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=Environment" 2>/dev/null) || true
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "LD_LIBRARY_PATH"; then
         pass "rootless healthcheck transient service has LD_LIBRARY_PATH"
     else
         fail "rootless healthcheck transient service missing LD_LIBRARY_PATH"
     fi
 
-    echo "--- rootless healthcheck: manual run succeeds ---"
-    if run_as_testuser "${PODMAN} healthcheck run ${HC_NAME_RL}" 2>&1; then
-        pass "rootless healthcheck run succeeded"
+    echo "--- rootless healthcheck: transient service has CONTAINERS_CONF ---"
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_CONF="; then
+        pass "rootless healthcheck transient service has CONTAINERS_CONF"
     else
-        fail "rootless healthcheck run failed"
+        fail "rootless healthcheck transient service missing CONTAINERS_CONF"
     fi
 
-    echo "--- rootless healthcheck: status is healthy ---"
-    HC_RL_STATUS=$(run_as_testuser "${PODMAN} inspect --format '{{.State.Health.Status}}' ${HC_NAME_RL}" 2>/dev/null) || true
-    if [ "${HC_RL_STATUS}" = "healthy" ]; then
-        pass "rootless healthcheck status is healthy"
+    echo "--- rootless healthcheck: transient service has CONTAINERS_REGISTRIES_CONF ---"
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_REGISTRIES_CONF="; then
+        pass "rootless healthcheck transient service has CONTAINERS_REGISTRIES_CONF"
     else
-        fail "rootless healthcheck status is '${HC_RL_STATUS}', expected 'healthy'"
+        fail "rootless healthcheck transient service missing CONTAINERS_REGISTRIES_CONF"
+    fi
+
+    echo "--- rootless healthcheck: transient service has CONTAINERS_STORAGE_CONF ---"
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_STORAGE_CONF="; then
+        pass "rootless healthcheck transient service has CONTAINERS_STORAGE_CONF"
+    else
+        fail "rootless healthcheck transient service missing CONTAINERS_STORAGE_CONF"
+    fi
+
+    echo "--- rootless healthcheck: timer-triggered status is healthy ---"
+    HC_RL_STATUS=""
+    for _i in $(seq 1 30); do
+        HC_RL_STATUS=$(run_as_testuser "${PODMAN} inspect --format '{{.State.Health.Status}}' ${HC_NAME_RL}" 2>/dev/null) || true
+        if [ "${HC_RL_STATUS}" = "healthy" ] || [ "${HC_RL_STATUS}" = "unhealthy" ]; then
+            break
+        fi
+        sleep 1
+    done
+    if [ "${HC_RL_STATUS}" = "healthy" ]; then
+        pass "rootless healthcheck timer-triggered status is healthy"
+    else
+        fail "rootless healthcheck timer-triggered status is '${HC_RL_STATUS}', expected 'healthy'"
     fi
 
     run_as_testuser "${PODMAN} rm -f ${HC_NAME_RL}" 2>/dev/null || true

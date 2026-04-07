@@ -85,9 +85,9 @@ Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `2
 
 ### 5g: Healthcheck Transient Unit Validation
 
-**VM:** 10/10 pass | **LXC:** not tested
+**VM:** 16/16 pass | **LXC:** 16/16 pass
 
-No failures. Both rootful and rootless healthcheck transient timers are created with `LD_LIBRARY_PATH` propagated, manual healthcheck execution succeeds, and containers report healthy status.
+No failures. For both rootful and rootless: transient timers are created, `ExecStart` references the shim (not the raw snap binary), `LD_LIBRARY_PATH` and all `CONTAINERS_*` config env vars are propagated, and the timer-triggered healthcheck reports healthy status. Tests use a 5-second health interval and wait for the timer to fire — they do not use manual `podman healthcheck run` (which would go through the shim and mask transient unit configuration issues).
 
 ---
 
