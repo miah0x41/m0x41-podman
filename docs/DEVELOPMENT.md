@@ -27,7 +27,7 @@ This takes approximately 15-20 minutes. The output is a `.snap` file in the proj
    - Downloads and stages `Go` 1.24.2 (build-time only, excluded from the snap)
    - Clones and builds `crun` 1.19.1 from source
    - Downloads pre-built `netavark` v1.14.1 and `aardvark-dns` v1.14.0 binaries
-   - Clones _Podman_ v5.8.1 from source, applies the healthcheck patch, and builds
+   - Clones _Podman_ v5.8.1 from source, applies the healthcheck and binary path patches, and builds
    - Builds `conmon` 2.0.26 from source
    - Stages Ubuntu 22.04 packages: `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables`
    - Bundles configuration files and the wrapper script
@@ -43,7 +43,7 @@ The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as t
 | `crun` | nil | Clones `crun` 1.19.1, runs `./autogen.sh && ./configure && make && make install` |
 | `conmon` | nil | Downloads and builds `conmon` 2.0.26 from source — upgraded from Ubuntu 22.04's v2.0.25 to fix stderr data loss |
 | `netavark` | nil | Downloads pre-built `netavark` and `aardvark-dns` binaries from GitHub Releases |
-| `podman` | nil | Clones _Podman_ v5.8.1, applies `patches/healthcheck-ld-library-path.patch`, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
+| `podman` | nil | Clones _Podman_ v5.8.1, applies `patches/healthcheck-ld-library-path.patch` and `patches/generate-systemd-binary-path.patch`, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
 | `configs` | dump | Copies `containers.conf`, `storage.conf`, `registries.conf`, `policy.json` into the snap |
 | `wrapper` | dump | Copies wrapper scripts (`podman-wrapper`, `conmon-wrapper`, `crun-wrapper`) that set `PATH` and `LD_LIBRARY_PATH` |
 
@@ -90,6 +90,7 @@ All scripts are in the `scripts/` directory.
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
 | `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, 785 tests) with categorised failure classification. Accepts `root` or `rootless` |
+| `upgrade-snap.sh` | Host | Stops rootless services, removes the old snap with `--purge`, installs the new snap from a provided path, restarts services, and runs health checks (shim, quadlet, generators, healthcheck validation) |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
 | `snap/hooks/install` | Host (on snap install) | Creates `/usr/local/bin/podman` shim, symlinks systemd generators, installs corrected systemd units, symlinks man pages, installs `policy.json`, detects stale native podman artefacts. See [QUADLET.md](QUADLET.md) |
 | `snap/hooks/remove` | Host (on snap remove) | Removes shim, generator symlinks, systemd units, and man page symlinks; warns about active Quadlet services |
@@ -114,11 +115,11 @@ _Podman_ v5.8.1 defaults to `pasta` for rootless networking, but `passt` was add
 
 The wrapper sets `LD_LIBRARY_PATH` for _Podman_, but when _Podman_ spawns `conmon`, which then spawns `crun`, the library path is lost. The snap bundles `libyajl` (required by `crun`), but `crun` can't find it at runtime. Fix: `containers.conf` points at `conmon-wrapper` and `crun-wrapper` scripts that set `LD_LIBRARY_PATH` before exec'ing the real binaries. This scopes library resolution to the snap's own processes without affecting the host.
 
-### `LD_LIBRARY_PATH` Not Propagated to Healthcheck Transient Units
+### Healthcheck Transient Units Bypass the Shim
 
-_Podman_ creates transient systemd timer and service units for container healthchecks. It reads `/proc/self/exe` to determine its own binary path and embeds that in the transient unit's `ExecStart`. After the shim `exec()`s the real binary, `/proc/self/exe` resolves to the raw snap path — bypassing the shim's `LD_LIBRARY_PATH` setup. There is no upstream configuration option or environment variable to override this path.
+_Podman_ creates transient systemd timer and service units for container healthchecks. It reads `/proc/self/exe` to determine its own binary path and embeds that in the transient unit's `ExecStart`. After the shim `exec()`s the real binary, `/proc/self/exe` resolves to the raw snap path — bypassing the shim's environment setup entirely. The transient unit runs without `LD_LIBRARY_PATH`, `CONTAINERS_CONF`, or the correct binary path.
 
-Fix: a 3-line patch (`patches/healthcheck-ld-library-path.patch`) to `libpod/healthcheck_linux.go` that propagates `LD_LIBRARY_PATH` via `systemd-run --setenv`, mirroring the existing `PATH` propagation. This is the only upstream source modification in the snap. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis, including why alternative approaches (`ldconfig`, compiled wrapper, user environment generator, transient unit monitor) were rejected. See [PATCH_SECURITY_REVIEW.md](investigations/PATCH_SECURITY_REVIEW.md) for the security analysis. The `ldconfig` approach was permanently rejected after it caused host-wide `systemd-networkd` and `systemd-resolved` SIGSEGV crashes — see [RCCA-LIBRARY-POISONING.md](investigations/RCCA-LIBRARY-POISONING.md).
+Fix: `patches/healthcheck-ld-library-path.patch` to `libpod/healthcheck_linux.go` makes three changes: (1) overrides the binary path via `PODMAN_BINARY` so `ExecStart` references the shim at `/usr/local/bin/podman`; (2) propagates `LD_LIBRARY_PATH` via `systemd-run --setenv`; (3) propagates `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF`. Without (1) and (3), healthcheck timers fail with `could not find "netavark"` (the raw binary lacks config pointing to the snap's helper binaries); without (2), they fail with `libgpgme.so.11: cannot open shared object file`. See [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full root cause analysis, including why alternative approaches (`ldconfig`, compiled wrapper, user environment generator, transient unit monitor) were rejected. See [PATCH_SECURITY_REVIEW.md](investigations/PATCH_SECURITY_REVIEW.md) for the security analysis. The `ldconfig` approach was permanently rejected after it caused host-wide `systemd-networkd` and `systemd-resolved` SIGSEGV crashes — see [RCCA-LIBRARY-POISONING.md](investigations/RCCA-LIBRARY-POISONING.md).
 
 ### `uidmap` and `dbus-user-session` Required on Host for Rootless
 

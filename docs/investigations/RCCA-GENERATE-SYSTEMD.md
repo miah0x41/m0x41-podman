@@ -54,13 +54,13 @@ A related but distinct mechanism affects `podman container runlabel --display`. 
 
 ## 3. Comparison with Healthcheck Issue
 
-The [healthcheck transient unit issue](HEALTHCHECK_ISSUES.md) has a similar root cause — _Podman_ creates systemd units that invoke the bare binary. The healthcheck fix propagates `LD_LIBRARY_PATH` via `--setenv` in `systemd-run` calls.
+The [healthcheck transient unit issue](HEALTHCHECK_ISSUES.md) has a similar root cause — _Podman_ creates systemd units that invoke the bare binary. The healthcheck patch now also uses `PODMAN_BINARY` to override the binary path, alongside `LD_LIBRARY_PATH` and `CONTAINERS_*` propagation via `--setenv` in `systemd-run` calls.
 
-That approach does not work here because:
-- Healthchecks: _Podman_ creates transient units at runtime via `systemd-run` and controls `--setenv` flags
-- `generate systemd`: _Podman_ outputs static unit file text — it cannot inject environment variables into future systemd invocations
+The `generate systemd` case requires a different approach because:
+- Healthchecks: _Podman_ creates transient units at runtime via `systemd-run` and controls both the `ExecStart` binary and `--setenv` flags
+- `generate systemd`: _Podman_ outputs static unit file text — it can only control the binary path, not inject environment variables into future systemd invocations
 
-The correct fix is to override the binary path itself so the generated unit references the shim (`/usr/local/bin/podman`) rather than the snap internal binary.
+Both patches share the `PODMAN_BINARY` override pattern, but the healthcheck patch additionally propagates environment variables (which is possible because it controls the `systemd-run` invocation).
 
 ---
 

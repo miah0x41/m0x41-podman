@@ -40,7 +40,7 @@ cmd = append(cmd, "--unit", hcUnitName, ..., podman)
 
 `os.Executable()` calls `readlink("/proc/self/exe")`, which resolves to the actual binary: `/snap/m0x41-podman/<revision>/usr/bin/podman`. This path is embedded as the `ExecStart` of the transient service unit.
 
-The function propagates `PATH` via `--setenv=PATH=...` but does **not** propagate `LD_LIBRARY_PATH` or any `CONTAINERS_*` environment variables.
+The function propagates `PATH` via `--setenv=PATH=...` but does **not** propagate `LD_LIBRARY_PATH`, `CONTAINERS_*` environment variables, or allow the binary path to be overridden.
 
 ### Why the Shim Cannot Help
 
@@ -55,7 +55,7 @@ The shim disappears after `exec()`. This is true regardless of whether the shim 
 
 ### Why the Wrappers Cannot Help
 
-The `conmon-wrapper` and `crun-wrapper` solve a different problem: _Podman_ invokes `conmon` and `crun` via paths in `containers.conf`, which we control. But _Podman_ does not look up its own path from config — it uses `/proc/self/exe`. There is no `engine.podman_binary` key, no `PODMAN_BINARY` environment variable, and no other override mechanism (confirmed against the v5.8.1 source).
+The `conmon-wrapper` and `crun-wrapper` solve a different problem: _Podman_ invokes `conmon` and `crun` via paths in `containers.conf`, which we control. But _Podman_ does not look up its own path from config — it uses `/proc/self/exe`. There is no `engine.podman_binary` key or other upstream override mechanism (confirmed against the v5.8.1 source). The `PODMAN_BINARY` environment variable used by the snap's patches is snap-specific — it was introduced by the patches described below.
 
 ## Impact
 
@@ -108,7 +108,20 @@ This approach was rejected as too fragile for a general-purpose package.
 
 ### 5. Source Patch to `createTimer()` — Recommended
 
-_Podman_ already propagates `PATH` via `--setenv=PATH=...` in `createTimer()`. The fix is to propagate `LD_LIBRARY_PATH` using the identical pattern. The patch to `libpod/healthcheck_linux.go` is three lines:
+_Podman_ already propagates `PATH` via `--setenv=PATH=...` in `createTimer()`. The patch to `libpod/healthcheck_linux.go` addresses three gaps:
+
+**5a. Binary path override via `PODMAN_BINARY`:**
+
+```go
+// Allow snap/wrapper environments to override the resolved binary path.
+if override := os.Getenv("PODMAN_BINARY"); override != "" {
+    podman = override
+}
+```
+
+Inserted after `os.Executable()`. Without this, `ExecStart` references the raw snap binary path, which runs without any environment setup. With this override, the transient unit invokes the shim at `/usr/local/bin/podman`, which sets up `PATH`, `LD_LIBRARY_PATH`, and config env vars.
+
+**5b. `LD_LIBRARY_PATH` propagation:**
 
 ```go
 ldLibPath := os.Getenv("LD_LIBRARY_PATH")
@@ -117,15 +130,27 @@ if ldLibPath != "" {
 }
 ```
 
-This is inserted immediately after the existing `PATH` propagation block.
+Inserted after the existing `PATH` propagation block, using the identical pattern.
+
+**5c. `CONTAINERS_*` config env var propagation:**
+
+```go
+for _, envVar := range []string{"CONTAINERS_CONF", "CONTAINERS_REGISTRIES_CONF", "CONTAINERS_STORAGE_CONF"} {
+    if val := os.Getenv(envVar); val != "" {
+        cmd = append(cmd, "--setenv="+envVar+"="+val)
+    }
+}
+```
+
+Without these, the transient unit runs _Podman_ with default config, which searches for `netavark` in standard system paths (`/usr/libexec/podman`, `/usr/lib/podman`, etc.) rather than the snap's bundled location. This causes `could not find "netavark"` errors.
 
 **Properties:**
 - Scoped to the transient unit only — no system-wide or user-wide environment changes
 - Works for both rootless and rootful
-- Follows the existing upstream convention
-- Three lines of Go, one file, no architectural changes
-- No fork required — applied via `sed` or `patch` in the snapcraft `override-build` step before `make podman`
-- The Go `-overlay` build flag is an alternative if modifying the source tree is undesirable
+- Follows the existing upstream convention for `PATH` propagation
+- All three additions are no-ops when the respective env vars are unset
+- One file, no architectural changes
+- No fork required — applied via `patch` in the snapcraft `override-build` step before `make podman`
 
 **Build integration:** The patch file at `patches/healthcheck-ld-library-path.patch` is applied in the `podman` part's `override-build` step in `snapcraft.yaml`:
 
@@ -143,15 +168,15 @@ Section 5g of `scripts/05_run_tests.sh` validates the fix for both rootful and r
 |------|-------------------|
 | Container starts with healthcheck | Basic healthcheck container lifecycle |
 | Transient timer exists | `systemd-run` created the timer unit |
-| Transient service has `LD_LIBRARY_PATH` | The patch propagated the environment variable |
-| Manual healthcheck run succeeds | The healthcheck binary can find its libraries |
+| Transient service has `LD_LIBRARY_PATH` | The patch propagated the library path variable |
+| Manual healthcheck run succeeds | The healthcheck binary can find its libraries and config |
 | Status is healthy | End-to-end healthcheck is functional |
 
 All five tests run for both rootful (system scope) and rootless (user scope), totalling 10 tests.
 
 ## Recommended Approach
 
-Apply solution 5 (source patch) as the primary fix. It solves both rootless and rootful with zero side effects.
+Apply solution 5 (source patch) as the primary fix. The combined patch (binary path override + `LD_LIBRARY_PATH` propagation + `CONTAINERS_*` propagation) solves both rootless and rootful with zero side effects.
 
 Solution 3 (user environment generator) may be added as a belt-and-braces measure for rootless, ensuring `LD_LIBRARY_PATH` is available to all user-scope _Podman_ operations, not just healthchecks. If adopted, the system-paths-first ordering described above must be used.
 
@@ -161,4 +186,6 @@ A comprehensive security analysis of this patch is in [PATCH_SECURITY_REVIEW.md]
 
 ## Upstream Contribution
 
-The patch is a candidate for upstream submission to `containers/podman`. The rationale — that `LD_LIBRARY_PATH` should be propagated alongside `PATH` in transient healthcheck units — applies to any packaging system where _Podman_'s libraries are not in the default linker path (snaps, AppImage, custom prefix installs). The change follows the existing code pattern and has no effect when `LD_LIBRARY_PATH` is unset.
+The `LD_LIBRARY_PATH` and `CONTAINERS_*` propagation portions are candidates for upstream submission to `containers/podman`. The rationale — that these variables should be propagated alongside `PATH` in transient healthcheck units — applies to any packaging system where _Podman_'s libraries or config are not in the default paths (snaps, AppImage, custom prefix installs). The changes follow the existing code pattern and have no effect when the respective variables are unset.
+
+The `PODMAN_BINARY` override is snap-specific and would need to be presented as a general-purpose mechanism (e.g. allowing any deployment to override the embedded binary path in transient units) for upstream consideration.

@@ -193,7 +193,7 @@ patches/                        # Upstream source patches applied at build time
 snap/                           # Bundled container engine configuration
   hooks/install                 # Install hook (shim, generators, man pages, policy.json)
   hooks/remove                  # Remove hook (cleanup)
-scripts/                        # Build, test, and multi-distro automation
+scripts/                        # Build, test, upgrade, and multi-distro automation
 docs/
   USER.md                       # User guide: snap vs native Podman differences
   DEVELOPMENT.md                # Build environment and script reference

@@ -1,6 +1,6 @@
 # Patch Security Review: Binary Path Override via `PODMAN_BINARY`
 
-The snap applies two upstream source modifications to _Podman_. This document analyses the security implications of the second patch: a `PODMAN_BINARY` environment variable override that controls which binary path appears in generated text output. The first patch (healthcheck `LD_LIBRARY_PATH` propagation) is reviewed separately in [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md).
+The snap applies two upstream source modifications to _Podman_. This document analyses the security implications of the second patch: a `PODMAN_BINARY` environment variable override that controls which binary path appears in generated text output. The first patch (healthcheck transient unit environment propagation, including `PODMAN_BINARY`, `LD_LIBRARY_PATH`, and `CONTAINERS_*` config vars) is reviewed separately in [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md).
 
 For the functional root cause analysis, see [RCCA-GENERATE-SYSTEMD.md](RCCA-GENERATE-SYSTEMD.md).
 
@@ -108,11 +108,12 @@ The `PODMAN_BINARY` value affects only:
 It does **not** affect:
 
 - Actual binary execution within _Podman_
-- Healthcheck transient units (those use `os.Executable()` without the override, plus the separate `LD_LIBRARY_PATH` patch)
 - Quadlet-generated units (those reference the shim via systemd generators)
 - Container runtime, networking, or storage
 - Any other _Podman_ subcommand
 - The host system environment
+
+**Note:** The healthcheck patch (`healthcheck-ld-library-path.patch`) also uses `PODMAN_BINARY` to override the binary path in transient healthcheck units. Unlike this patch (which affects text output only), the healthcheck override affects a real `ExecStart` path that systemd executes. The security properties are equivalent — see [PATCH_SECURITY_REVIEW.md](PATCH_SECURITY_REVIEW.md).
 
 ## Verdict
 

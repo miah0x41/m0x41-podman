@@ -185,9 +185,15 @@ systemctl --user enable --now podman.socket
 
 The service unit uses the shim at `/usr/local/bin/podman`, not the snap binary directly — this survives snap refresh.
 
-## Source Modification
+## Source Modifications
 
-The snap applies one patch to the upstream _Podman_ source at build time. _Podman_ creates transient systemd units for container healthchecks and embeds its own binary path in them. In the snap, this path resolves to the raw binary inside the snap filesystem, which lacks the library path setup needed to find bundled libraries. The patch adds three lines to `libpod/healthcheck_linux.go` that propagate `LD_LIBRARY_PATH` to the transient unit — mirroring how _Podman_ already propagates `PATH`. Without this patch, container healthchecks fail silently. See [COMPONENTS.md](COMPONENTS.md#source-modifications) for details and [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full analysis.
+The snap applies two patches to the upstream _Podman_ source at build time. Both address the same underlying issue: after the shim `exec()`s the real binary, `/proc/self/exe` resolves to the raw snap path, so any code that embeds the binary path in generated output or transient units bypasses the shim's environment setup.
+
+**Healthcheck patch** (`healthcheck-ld-library-path.patch`): _Podman_ creates transient systemd units for container healthchecks. The patch overrides the binary path via `PODMAN_BINARY` (so the transient unit references the shim), propagates `LD_LIBRARY_PATH`, and propagates `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` to the transient unit. Without this patch, healthcheck timers fail with `could not find "netavark"` or missing shared library errors.
+
+**Binary path patch** (`generate-systemd-binary-path.patch`): `podman generate systemd` and `podman container runlabel --display` embed the resolved binary path in their text output. The patch checks `PODMAN_BINARY` and overrides the path so output references the shim at `/usr/local/bin/podman`. This patch affects text output only — it does not change runtime execution.
+
+See [COMPONENTS.md](COMPONENTS.md#source-modifications) for details and [HEALTHCHECK_ISSUES.md](investigations/HEALTHCHECK_ISSUES.md) for the full healthcheck analysis.
 
 ## Unsupported Features
 

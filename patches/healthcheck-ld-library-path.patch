@@ -1,6 +1,20 @@
 --- a/libpod/healthcheck_linux.go
 +++ b/libpod/healthcheck_linux.go
-@@ -36,6 +36,10 @@
+@@ -29,16 +29,29 @@
+ 	podman, err := os.Executable()
+ 	if err != nil {
+ 		return fmt.Errorf("failed to get path for podman for a health check timer: %w", err)
+ 	}
++	// Allow snap/wrapper environments to override the resolved binary path.
++	if override := os.Getenv("PODMAN_BINARY"); override != "" {
++		podman = override
++	}
+ 
+ 	var cmd = []string{"--property", "LogLevelMax=notice"}
+ 	if rootless.IsRootless() {
+ 		cmd = append(cmd, "--user")
+ 	}
+ 	path := os.Getenv("PATH")
  	if path != "" {
  		cmd = append(cmd, "--setenv=PATH="+path)
  	}
@@ -8,6 +22,11 @@
 +	if ldLibPath != "" {
 +		cmd = append(cmd, "--setenv=LD_LIBRARY_PATH="+ldLibPath)
 +	}
-
++	for _, envVar := range []string{"CONTAINERS_CONF", "CONTAINERS_REGISTRIES_CONF", "CONTAINERS_STORAGE_CONF"} {
++		if val := os.Getenv(envVar); val != "" {
++			cmd = append(cmd, "--setenv="+envVar+"="+val)
++		}
++	}
+ 
  	// StartLimitIntervalSec=0 so we don't hit the restart limit
  	cmd = append(cmd, "--unit", hcUnitName, fmt.Sprintf("--on-unit-inactive=%s", interval), "--timer-property=AccuracySec=1s", "--property=StartLimitIntervalSec=0", podman)
