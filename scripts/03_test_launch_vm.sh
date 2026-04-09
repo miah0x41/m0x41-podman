@@ -14,7 +14,7 @@ CONTAINER_NAME="m0x41-podman-test-vm"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GIT_SHORT=$(git -C "${PROJECT_DIR}" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-SNAP_FILE=$(ls -t "${PROJECT_DIR}"/m0x41-podman_*".g${GIT_SHORT}_"*.snap 2>/dev/null | head -1)
+SNAP_FILE=$(ls -t "${PROJECT_DIR}"/m0x41-podman_*".g${GIT_SHORT}_"*.snap 2>/dev/null | head -1 || true)
 TIER="${1:-all}"
 
 if [ -z "${SNAP_FILE}" ] || [ ! -f "${SNAP_FILE}" ]; then

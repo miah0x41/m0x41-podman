@@ -16,15 +16,17 @@ Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
 ## `core22` Snap — Multi-Distro
 
-Tested 2026-03-25 on WSL2. All distros run in parallel via `06_test_multi_distro.sh`.
+All distros run in parallel via `06_test_multi_distro.sh`.
 
-| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (20) |
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (48) |
 |--------|---------|------------|------------|------------|-------------|
-| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 20/20 |
-| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 20/20 |
-| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 20/20 |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 19/20 |
-| Fedora 42 | 2.41 | 5/7 | 1/8 | 6/6 | 18/20 |
+| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 48/48 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 48/48 |
+| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 48/48 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 48/48 |
+| Fedora 43 | 2.41 | 5/7 | 1/8 | 6/6 | 38/48 |
+
+Fedora 43 rootless failures are caused by `newuidmap` lacking the setuid bit inside LXD containers (see [Known Failures](#fedora-rootless-failures-in-lxd)). Rootful (tier 3) passes all 6 tests.
 
 ## Native Build (Ubuntu 24.04, VM)
 
@@ -40,7 +42,7 @@ The baseline — all tiers pass against _Podman_ built and installed natively (n
 
 ## Wrapper Dependency Detection — Multi-Distro
 
-Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_launch.sh`.
+All distros run in parallel via `08_wrapper_test_launch.sh`.
 
 | Distro | Wrapper Tests (18) |
 |--------|--------------------|
@@ -48,7 +50,7 @@ Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_laun
 | Ubuntu 24.04 | **18/18 pass** |
 | Debian 12 | **18/18 pass** |
 | CentOS 9 Stream | **18/18 pass** |
-| Fedora 42 | **18/18 pass** |
+| Fedora 43 | **18/18 pass** |
 
 ## Known Failures
 
@@ -65,9 +67,9 @@ Both are structural snap differences, not functional regressions. The same tests
 
 In LXC: 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact`. In the VM: 2 failures — `basic` (times out waiting for `STARTED CONTAINER`) and `envvar` (environment variable passthrough differs under snap shim). The remaining 3 LXC-only failures are resolved by the full VM kernel and `apache2-utils`. Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `251-system-service.bats` (19/19), and `270-socket-activation.bats` (3/3) pass in both environments.
 
-### Fedora 42: Rootless Failures in LXD
+### Fedora: Rootless Failures in LXD
 
-`newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 6 tests.
+`newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 6 tests. Confirmed on both Fedora 42 and 43.
 
 ### Rootless Requires Host `uidmap` and `dbus-user-session`
 
