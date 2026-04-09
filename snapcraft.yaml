@@ -54,10 +54,6 @@ architectures:
 apps:
   m0x41-podman:
     command: bin/podman-wrapper
-    environment:
-      CONTAINERS_CONF: /snap/m0x41-podman/current/etc/containers/containers.conf
-      CONTAINERS_REGISTRIES_CONF: /snap/m0x41-podman/current/etc/containers/registries.conf
-      CONTAINERS_STORAGE_CONF: /snap/m0x41-podman/current/etc/containers/storage.conf
 
 parts:
   go:

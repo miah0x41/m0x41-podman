@@ -7,15 +7,8 @@ set -euo pipefail
 CONTAINER_NAME="m0x41-podman-test"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SNAP_FILE=$(ls -t "${PROJECT_DIR}"/m0x41-podman_*.snap 2>/dev/null | head -1)
+source "${SCRIPT_DIR}/find-snap.sh"
 TIER="${1:-all}"
-
-if [ -z "${SNAP_FILE}" ] || [ ! -f "${SNAP_FILE}" ]; then
-    echo "ERROR: No snap file found in: ${PROJECT_DIR}"
-    echo "Build it first with: ./scripts/01_launch.sh"
-    exit 1
-fi
-SNAP_BASENAME=$(basename "${SNAP_FILE}")
 
 echo "=== Step 1: Create LXD container ==="
 if lxc info "${CONTAINER_NAME}" &>/dev/null; then
@@ -44,7 +37,7 @@ fi
 echo "Container IP: $(lxc list "${CONTAINER_NAME}" -f csv -c 4 | cut -d' ' -f1)"
 
 echo "=== Step 2: Push snap and scripts ==="
-lxc file push "${SNAP_FILE}" "${CONTAINER_NAME}/root/m0x41-podman_5.8.1_amd64.snap"  # inner scripts expect this name
+lxc file push "${SNAP_FILE}" "${CONTAINER_NAME}/root/m0x41-podman.snap"
 lxc file push "${SCRIPT_DIR}/04_test_setup.sh" "${CONTAINER_NAME}/root/04_test_setup.sh"
 lxc file push "${SCRIPT_DIR}/05_run_tests.sh" "${CONTAINER_NAME}/root/05_run_tests.sh"
 lxc exec "${CONTAINER_NAME}" -- chmod +x /root/04_test_setup.sh /root/05_run_tests.sh

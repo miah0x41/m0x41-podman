@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SNAP="/snap/m0x41-podman/current"
-SNAP_FILE="/root/m0x41-podman_5.8.1_amd64.snap"
+SNAP_FILE="/root/m0x41-podman.snap"
 TESTUSER="podtest"
 
 # ---------- Phase 1: Detect distro ----------

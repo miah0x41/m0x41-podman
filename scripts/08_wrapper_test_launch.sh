@@ -7,7 +7,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SNAP_FILE="${PROJECT_DIR}/m0x41-podman_5.8.1_amd64.snap"
+source "${SCRIPT_DIR}/find-snap.sh"
 RESULTS_FILE="${PROJECT_DIR}/wrapper-test-results.txt"
 
 WRAPPER_TEST_COUNT=18
@@ -21,15 +21,9 @@ for arg in "$@"; do
     esac
 done
 
-if [ ! -f "${SNAP_FILE}" ]; then
-    echo "ERROR: Snap file not found: ${SNAP_FILE}"
-    echo "Build it first with: ./scripts/01_launch.sh"
-    exit 1
-fi
-
 # Distro matrix
-DISTRO_NAMES=(   "ubuntu-2204"   "ubuntu-2404"   "debian-12"         "fedora-42"         "centos-9"               )
-DISTRO_IMAGES=(  "ubuntu:22.04"  "ubuntu:24.04"  "images:debian/12"  "images:fedora/42"  "images:centos/9-Stream" )
+DISTRO_NAMES=(   "ubuntu-2204"   "ubuntu-2404"   "debian-12"         "fedora-43"         "centos-9"               )
+DISTRO_IMAGES=(  "ubuntu:22.04"  "ubuntu:24.04"  "images:debian/12"  "images:fedora/43"  "images:centos/9-Stream" )
 
 # Test a single distro end-to-end (runs in a subshell for parallel execution)
 test_distro() {
@@ -75,7 +69,7 @@ test_distro() {
 
         # --- Push files ---
         echo "Pushing snap and scripts..."
-        lxc file push "${SNAP_FILE}" "${container}/root/m0x41-podman_5.8.1_amd64.snap"
+        lxc file push "${SNAP_FILE}" "${container}/root/m0x41-podman.snap"
         lxc file push "${SCRIPT_DIR}/09_wrapper_test_setup.sh" "${container}/root/09_wrapper_test_setup.sh"
         lxc file push "${SCRIPT_DIR}/10_wrapper_tests.sh" "${container}/root/10_wrapper_tests.sh"
         lxc exec "${container}" -- chmod +x /root/09_wrapper_test_setup.sh /root/10_wrapper_tests.sh

@@ -18,9 +18,9 @@ cat > /usr/local/bin/podman <<'SHIM'
 SNAP=/snap/m0x41-podman/current
 export PATH="$SNAP/usr/bin:$SNAP/usr/sbin:$SNAP/usr/libexec/podman:$SNAP/usr/lib/podman:/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export CONTAINERS_CONF="$SNAP/etc/containers/containers.conf"
-export CONTAINERS_REGISTRIES_CONF="$SNAP/etc/containers/registries.conf"
-export CONTAINERS_STORAGE_CONF="$SNAP/etc/containers/storage.conf"
+export CONTAINERS_CONF="${CONTAINERS_CONF:-$SNAP/etc/containers/containers.conf}"
+export CONTAINERS_REGISTRIES_CONF="${CONTAINERS_REGISTRIES_CONF:-$SNAP/etc/containers/registries.conf}"
+export CONTAINERS_STORAGE_CONF="${CONTAINERS_STORAGE_CONF:-$SNAP/etc/containers/storage.conf}"
 export PODMAN_BINARY="/usr/local/bin/podman"
 exec "$SNAP/usr/bin/podman" "$@"
 SHIM
