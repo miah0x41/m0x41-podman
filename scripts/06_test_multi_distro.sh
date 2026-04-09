@@ -7,8 +7,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-GIT_SHORT=$(git -C "${PROJECT_DIR}" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-SNAP_FILE=$(ls -t "${PROJECT_DIR}"/m0x41-podman_*".g${GIT_SHORT}_"*.snap 2>/dev/null | head -1 || true)
+source "${SCRIPT_DIR}/find-snap.sh"
 RESULTS_FILE="${PROJECT_DIR}/multi-distro-results.txt"
 
 # Test counts per tier (must match 05_run_tests.sh)
@@ -28,13 +27,6 @@ for arg in "$@"; do
         *) echo "Usage: $0 [--cleanup] [tier1|tier2|tier3|tier5|all]"; exit 1 ;;
     esac
 done
-
-if [ -z "${SNAP_FILE}" ] || [ ! -f "${SNAP_FILE}" ]; then
-    echo "ERROR: No snap matching HEAD (${GIT_SHORT}) in ${PROJECT_DIR}"
-    echo "Build it first with: ./scripts/01_launch.sh"
-    exit 1
-fi
-echo "Using snap: $(basename "${SNAP_FILE}")"
 
 # Distro matrix — parallel indexed arrays
 DISTRO_NAMES=(   "ubuntu-2204"   "ubuntu-2404"   "debian-12"         "fedora-43"         "centos-9"               )
