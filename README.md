@@ -16,11 +16,20 @@ This project exists because there is no official _Podman_ snap, and previous com
 
 - [mgoltzsche/podman-static](https://github.com/mgoltzsche/podman-static?tab=readme-ov-file) — _Podman_ static builds.
 
-## Quick Start
+## Installation
+
+Download the latest release from [GitHub Releases](https://github.com/miah0x41/m0x41-podman/releases) and install:
 
 ```bash
-sudo snap install m0x41-podman_5.8.1_amd64.snap --dangerous --classic
+# Download the latest release
+curl -fsSL -o m0x41-podman.snap \
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap1_amd64.snap"
+
+# Install
+sudo snap install m0x41-podman.snap --dangerous --classic
 ```
+
+The `--dangerous` flag is required because the snap is sideloaded from GitHub rather than the Snap Store (see [Snap Store Status](#snap-store-status)). The `--classic` flag grants the host filesystem access that _Podman_ requires for rootless operation and systemd integration.
 
 The snap's install hook places `podman` on PATH at `/usr/local/bin/podman` and registers systemd generators for Quadlet. Both happen automatically — no manual configuration needed.
 
@@ -184,6 +193,20 @@ The full upstream BATS suite (78 files, 785 tests) can also be run against the s
 ## Why Classic Confinement?
 
 Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement also enables the install hook to register systemd generators for Quadlet and place the `podman` shim on PATH — operations that strict confinement does not permit. See [docs/CLASSIC_CONFINEMENT.md](docs/CLASSIC_CONFINEMENT.md) for the full technical justification and evaluation of existing snapd interfaces.
+
+## Snap Store Status
+
+A classic confinement request was submitted to the Snap Store but was not granted. The [forum discussion](https://forum.snapcraft.io/t/m0x41-podman-unofficial-podman-snap-package/50805) has the full details. As a result, this snap cannot be published to the Snap Store and must be sideloaded from [GitHub Releases](https://github.com/miah0x41/m0x41-podman/releases) using `--dangerous --classic`.
+
+This means automatic updates via `snapd` are not available. To upgrade, download the new release and re-install:
+
+```bash
+sudo snap install m0x41-podman_<version>_amd64.snap --dangerous --classic
+```
+
+## Community Adoption
+
+This repository is licensed under the [Apache License 2.0](LICENSE). Anyone in the snapcraft community is welcome to fork this repository and maintain a _Podman_ snap under their own name or as part of an official effort. If a formally maintained _Podman_ snap becomes available on the Snap Store, this repository will be deprecated in its favour.
 
 ## Repository Structure and Documentation
 

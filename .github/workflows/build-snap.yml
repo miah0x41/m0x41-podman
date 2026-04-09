@@ -1,0 +1,27 @@
+name: Build Snap
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build snap
+        uses: snapcore/action-build@v1
+        id: build
+
+      - name: Rename snap artifact
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mv ${{ steps.build.outputs.snap }} "m0x41-podman_${version}_amd64.snap"
+          echo "snap_file=m0x41-podman_${version}_amd64.snap" >> "$GITHUB_ENV"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.snap_file }}
