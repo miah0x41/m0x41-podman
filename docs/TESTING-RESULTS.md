@@ -4,17 +4,15 @@ Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
 ## `core22` Snap — Single Distro (Ubuntu 24.04)
 
-Tested 2026-03-25 (LXC, WSL2) and 2026-04-01 (VM, bare-metal).
-
 | Tier | LXC Container | LXD VM | Description |
 |------|--------------|--------|-------------|
 | 1 | 7/7 pass | 7/7 pass | Version, `crun`, `netavark`, overlay, `conmon`, config paths |
 | 2 | 8/8 pass | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
 | 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
-| 4 | 28/31 | 28/31 | `BATS` parity — 3 snap-specific failures (see [Known Failures](#known-failures)) |
-| 5a-5d | 20/20 pass | 20/20 pass | Install hook (including socket units, man pages), Quadlet dry-run, live rootful/rootless Quadlet |
-| 5e | 68/73 | 72/73 | `BATS` system-service, socket-activation, quadlet 252-254 — quadlet symlink and `htpasswd` fix for VM |
-| 6 | — | 29/29 pass | Host-side impact: network, ldconfig, systemd, reboot, removal (includes quadlet symlink validation) |
+| 4 | 29/31 | 29/31 | `BATS` parity — 2 snap-specific failures (see [Known Failures](#known-failures)) |
+| 5a-5d,5g | 48/48 pass | 48/48 pass | Install hook, Quadlet dry-run, live rootful/rootless Quadlet, healthcheck transient unit validation |
+| 5e | 68/73 | 71/73 | `BATS` system-service, socket-activation, quadlet 252-254 |
+| 6 | — | 31/31 pass | Host-side impact: network, ldconfig, systemd, reboot, removal |
 
 ## `core22` Snap — Multi-Distro
 
@@ -54,19 +52,18 @@ Tested 2026-03-24 on WSL2. All distros run in parallel via `08_wrapper_test_laun
 
 ## Known Failures
 
-### Tier 4: 3 `BATS` Failures (Snap Config Conflicts)
+### Tier 4: 2 `BATS` Failures
 
 | Test | Cause |
 |------|-------|
-| `podman info - json` | Snap's `CONTAINERS_CONF` env var overrides the test's temporary config; teardown cleans up state that was never created |
-| `CONTAINERS_CONF_OVERRIDE` | Test sets `CONTAINERS_CONF` — but the snap's env var (from `snapcraft.yaml`) takes precedence |
-| `empty string defaults` | Test expects a warning when no storage driver is configured; the snap always provides `CONTAINERS_STORAGE_CONF` |
+| `podman info - json` | `conmon.package` reports `Unknown` (snap builds conmon from source); `rootlessNetworkCmd` is `slirp4netns` (snap bundles `slirp4netns`, not `pasta`) |
+| `CONTAINERS_CONF_OVERRIDE` | Test provides a custom `CONTAINERS_CONF` that defaults to `pasta` networking; `pasta` is not bundled in the snap (`core22` base) |
 
-All three are snap-specific environment conflicts, not functional regressions. The same tests pass in the native build.
+Both are structural snap differences, not functional regressions. The same tests pass in the native build. `empty string defaults` was previously failing but is now recovered by the adapted shim (config env vars are no longer force-set).
 
 ### Tier 5e: `252-quadlet.bats` Failures
 
-In LXC (without `htpasswd`): 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact`. In the VM (with `apache2-utils` installed): 4 failures — the `artifact` test passes. The remaining 4 are snap-specific environment conflicts similar to the tier 4 failures. Tests `253-podman-quadlet.bats` (9/9) and `254-podman-quadlet-multi.bats` (5/5) pass fully in both environments.
+In LXC: 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact`. In the VM: 2 failures — `basic` (times out waiting for `STARTED CONTAINER`) and `envvar` (environment variable passthrough differs under snap shim). The remaining 3 LXC-only failures are resolved by the full VM kernel and `apache2-utils`. Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `251-system-service.bats` (19/19), and `270-socket-activation.bats` (3/3) pass in both environments.
 
 ### Fedora 42: Rootless Failures in LXD
 
@@ -114,82 +111,57 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 | **Infra** | Missing test infrastructure (registry, `htpasswd`, `skopeo`, test binary) |
 | **Other** | Requires manual investigation |
 
-### Results — Root Mode (Ubuntu 24.04, LXC vs VM)
+### Results — Root Mode (Ubuntu 24.04, VM)
 
-LXC tested 2026-03-25 on WSL2. VM tested 2026-04-02 on bare-metal (KVM), after corrective actions (quadlet symlink, `buildah`, `podman-testing`).
+| Category | Tests | Pass | Skip | Fail |
+|----------|-------|------|------|------|
+| System & Info | 116 | 89 | 12 | 15 |
+| Container Lifecycle | 149 | 137 | 11 | 1 |
+| Images | 104 | 102 | 2 | 0 |
+| Volumes & Storage | 59 | 55 | 3 | 1 |
+| Networking | 111 | 21 | 89 | 1 |
+| Pods & Kube | 59 | 55 | 3 | 1 |
+| Systemd & Quadlet | 113 | 96 | 15 | 2 |
+| Security & Namespaces | 47 | 21 | 26 | 0 |
+| Advanced | 27 | 8 | 19 | 0 |
+| **Total** | **785** | **584** | **180** | **21** |
 
-| Category | Tests | Skip | LXC Pass | LXC Fail | VM Pass | VM Fail | Δ Pass |
-|----------|-------|------|----------|----------|---------|---------|--------|
-| System & Info | 116 | 12 | 83 | 21 | 83 | 21 | 0 |
-| Container Lifecycle | 149 | 11 | 130 | 8 | 136 | 2 | +6 |
-| Images | 104 | 2 | 76 | 23 | 99 | 3 | +23 |
-| Volumes & Storage | 59 | 3 | 52 | 3 | 55 | 1 | +3 |
-| Networking | 111 | 89 | 20 | 2 | 21 | 1 | +1 |
-| Pods & Kube | 59 | 3 | 53 | 4 | 55 | 1 | +2 |
-| Systemd & Quadlet | 113 | 15 | 40 | 61 | 81 | 17 | +41 |
-| Security & Namespaces | 47 | 26 | 18 | 4 | 21 | 0 | +3 |
-| Advanced | 27 | 19 | 8 | 0 | 8 | 0 | 0 |
-| **Total** | **785** | **180** | **480** | **126** | **559** | **46** | **+79** |
+Of the 785 tests, 180 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **605 applicable tests**: **584 pass (96.5%)**. The 21 residual failures are structural (missing `pasta`, `podman-testing` infra, timing). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
 
-Of the 785 tests, 180 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **605 applicable tests**: **VM: 559 pass (92%)** vs LXC: 480 pass (79%). The VM gains **+79 passing tests**. With the adapted shim pass (see below): **564/605 (93%)**.
-
-Key improvements over LXC:
-
-- **LXD limitations eliminated**: 3 LXD-specific failures drop to 0.
-- **Quadlet symlink**: Install hook now creates `/usr/libexec/podman/quadlet` — recovers 44 tests in `252-quadlet.bats` and `253-podman-quadlet.bats`.
-- **`buildah` installed**: Recovers 5 tests that exercise Podman–Buildah shared storage.
-- **Images/Security**: +23/+3 from tests that work reliably with a full VM kernel.
-
-The 46 residual failures are analysed in [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
-
-### Results — Root Mode Adapted Pass
-
-After the upstream pass, `11_run_bats_full.sh` re-runs snap-classified failures with an adapted shim that respects pre-existing `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` / `CONTAINERS_REGISTRIES_CONF` environment variables. This proves which failures are caused by the shim's config override vs structural snap differences.
-
-| Metric | Upstream | Adapted | Recovered |
-|--------|----------|---------|-----------|
-| Total pass | 559 | 564 | +5 |
-| Total fail | 46 | 41 | -5 |
-| Files re-run | — | 9 | — |
-
-The 5 recovered tests are in `800-config.bats` (+2), `005-info.bats` (+1), `030-run.bats` (+1), `070-build.bats` (+1). The remaining 22 adapted-pass failures are structural — see [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md). Of these, 18 share the same root cause: `podman generate systemd` (deprecated) embeds the snap's internal binary path in generated unit files.
+The adapted shim (config env vars set conditionally, respecting pre-existing values) recovered **+25 tests** over the previous unconditional config override: System & Info (+6), Container Lifecycle (+1), Images (+3), Systemd & Quadlet (+15).
 
 ### Results — Rootless Mode (Ubuntu 24.04, VM)
 
-Tested 2026-04-01 on bare-metal (KVM), before corrective actions. Rootless full BATS was not previously run in LXC. To be re-run after corrective actions for updated numbers.
+| Category | Tests | Pass | Skip | Fail |
+|----------|-------|------|------|------|
+| System & Info | 116 | 89 | 10 | 17 |
+| Container Lifecycle | 149 | 142 | 6 | 1 |
+| Images | 104 | 101 | 3 | 0 |
+| Volumes & Storage | 59 | 52 | 7 | 0 |
+| Networking | 111 | 19 | 1 | 91 |
+| Pods & Kube | 59 | 56 | 2 | 1 |
+| Systemd & Quadlet | 113 | 95 | 13 | 5 |
+| Security & Namespaces | 47 | 18 | 29 | 0 |
+| Advanced | 27 | 12 | 15 | 0 |
+| **Total** | **785** | **584** | **86** | **115** |
 
-| Category | Tests | Pass | Skip | Snap | LXD | Infra | Other |
-|----------|-------|------|------|------|-----|-------|-------|
-| System & Info | 116 | 82 | 10 | 6 | 0 | 11 | 7 |
-| Container Lifecycle | 149 | 136 | 6 | 3 | 0 | 0 | 4 |
-| Images | 104 | 97 | 3 | 1 | 0 | 0 | 3 |
-| Volumes & Storage | 59 | 52 | 7 | 0 | 0 | 0 | 0 |
-| Networking | 111 | 19 | 1 | 91 | 0 | 0 | 0 |
-| Pods & Kube | 59 | 54 | 2 | 0 | 0 | 0 | 3 |
-| Systemd & Quadlet | 113 | 41 | 10 | 16 | 0 | 0 | 46 |
-| Security & Namespaces | 47 | 18 | 29 | 0 | 0 | 0 | 0 |
-| Advanced | 27 | 12 | 15 | 0 | 0 | 0 | 0 |
-| **Total** | **785** | **511** | **83** | **117** | **0** | **11** | **63** |
+**584/785 pass, 86 skipped, 115 failures.** However, 91 of those failures are `pasta` networking tests (`505-networking-pasta.bats` + `500-networking.bats`) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. Excluding `pasta`: **584/608 applicable tests (96.1%)** with 24 real failures.
 
-**511/785 pass, 83 skipped, 191 failures.** However, 91 of those failures are `pasta` networking tests (`505-networking-pasta.bats` + `500-networking.bats`) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. These are not applicable to the snap. Excluding `pasta`, rootless passes **511/611 applicable tests (84%)** with 100 real failures.
-
-Rootless actually passes **5 more tests** than root mode (511 vs 506) because root-only skips (e.g. `060-mount.bats`, `550-pause-process.bats`) become rootless-passing tests. Key differences from root mode:
-
-- **Networking: 91 `pasta` tests** — not applicable. The snap bundles `slirp4netns` because `pasta` is not available on the `core22` base. In root mode these tests skip (detected as absent); in rootless mode they run and fail.
-- **LXD failures: 0** — confirms that all rootless user namespace operations work correctly in a VM with `apparmor_restrict_unprivileged_userns=0`.
+The adapted shim recovered **+73 tests** over the previous unconditional config override (up from 511). Rootless passes the same number of tests as root mode (584) because root-only skips (e.g. `060-mount.bats`, `550-pause-process.bats`) become rootless-passing tests, offsetting the additional `pasta` failures.
 
 ### Notes
 
 - **`pasta` networking tests (91 rootless, 89 root skips)** are not applicable. The snap bundles `slirp4netns` because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode the test harness detects `pasta` as absent and skips them; in rootless mode it attempts to run them and they fail. These should be excluded when comparing against native _Podman_ pass rates.
-- **Snap-specific failures (27 root)** are caused by the snap shim force-setting `CONTAINERS_CONF` and `CONTAINERS_STORAGE_CONF` environment variables. Of these, 5 are recoverable when the shim respects pre-existing env vars (demonstrated by the adapted pass). The remaining 22 are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
+- **Adapted shim** — the shim and wrapper now set `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` conditionally (`${VAR:-default}`), respecting pre-existing values. This recovered 25 root and 73 rootless tests that previously failed due to config overrides.
+- **Remaining snap-specific failures** are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path, and `podman-testing` runs outside the snap environment. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
 - **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
 - **`conmon` upgraded to v2.0.26**: Fixes stderr data loss with large stdout volumes (`030-run.bats` test 34). See [conmon#236](https://github.com/containers/conmon/issues/236). Built from source (pre-built binaries lack journald support).
-- **Security skips (26)** include 21 SELinux tests — SELinux is not enabled in Ubuntu.
-- **Advanced skips (19)** include checkpoint/restore, SSH, and remote tests.
+- **Security skips (26 root, 29 rootless)** include SELinux tests — SELinux is not enabled in Ubuntu.
+- **Advanced skips (19 root, 15 rootless)** include checkpoint/restore, SSH, and remote tests.
 
 ## `core22` Snap — Host-Side Impact (Tier 6, VM)
 
-Tested 2026-04-01 on bare-metal (KVM). These tests can only run in a VM because they validate system-level side effects invisible from inside a nested container.
+These tests can only run in a VM because they validate system-level side effects invisible from inside a nested container.
 
 | Test Group | Tests | Result |
 |-----------|-------|--------|
@@ -197,8 +169,8 @@ Tested 2026-04-01 on bare-metal (KVM). These tests can only run in a VM because 
 | 6b: Library path integrity | 3 | 3/3 pass — ldconfig cache, ld.so.conf.d, host `ldd` all clean |
 | 6c: systemd health | 3 | 3/3 pass — no failed podman units, systemd-resolved active, system running |
 | 6d: Reboot survival | 9 | 9/9 pass — snap, shim, podman, rootful, rootless, DNS, ldconfig, units, quadlet all survive reboot |
-| 6e: Snap removal cleanup | 9 | 9/9 pass — shim, generators, units, man pages, ldconfig, ld.so.conf.d, systemd all clean after removal |
-| **Total** | **29** | **29/29 pass** |
+| 6e: Snap removal cleanup | 11 | 11/11 pass — shim, generators, quadlet, units, man pages, ldconfig, ld.so.conf.d, systemd units, DNS, systemd all clean after removal |
+| **Total** | **31** | **31/31 pass** |
 
 ## Test Environment
 

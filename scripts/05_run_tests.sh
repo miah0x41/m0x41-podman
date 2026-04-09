@@ -491,8 +491,13 @@ CEOF
     fi
 
     echo "--- rootless quadlet output correct ---"
+    # Try user journal first; fall back to system journal (CentOS/RHEL in LXD
+    # does not populate user journals, but process output lands in the system
+    # journal with _SYSTEMD_USER_UNIT metadata)
     if run_as_testuser "journalctl --user -u snap-test-rootless.service --no-pager -n 10" 2>/dev/null | grep -q "quadlet-rootless-ok"; then
         pass "rootless quadlet output: quadlet-rootless-ok"
+    elif journalctl _SYSTEMD_USER_UNIT=snap-test-rootless.service --no-pager -n 10 2>/dev/null | grep -q "quadlet-rootless-ok"; then
+        pass "rootless quadlet output: quadlet-rootless-ok (system journal)"
     else
         fail "rootless quadlet output missing"
     fi
