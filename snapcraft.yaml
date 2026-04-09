@@ -32,7 +32,7 @@ description: |
   * Ubuntu 24.04 — pass (`apt install uidmap dbus-user-session`)
   * Debian 12 — pass (`apt install uidmap dbus-user-session iptables`)
   * CentOS 9 Stream — pass (`dnf install shadow-utils dbus-daemon iptables-nft libgpg-error`)
-  * Fedora 42 — rootful pass (`dnf install shadow-utils dbus-daemon iptables-nft libgpg-error`);
+  * Fedora 43 — rootful pass (`dnf install shadow-utils dbus-daemon iptables-nft libgpg-error`);
     rootless fails in LXD due to missing setuid on `newuidmap`
 
   This snap has been extensively tested across the distributions listed

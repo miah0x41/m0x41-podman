@@ -131,7 +131,7 @@ The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and
 
 ### `iptables` Not Found on Non-Ubuntu Hosts
 
-`netavark` calls `iptables` as a child process of `conmon`. On Ubuntu, `iptables` is always present. On Debian 12, CentOS 9, and Fedora 42 (which use `nftables` natively), `iptables` must be installed on the host. The `nftables` driver (`firewall_driver = "nftables"`) was attempted but fails in LXD on WSL2 due to missing kernel modules.
+`netavark` calls `iptables` as a child process of `conmon`. On Ubuntu, `iptables` is always present. On Debian 12, CentOS 9, and Fedora 43 (which use `nftables` natively), `iptables` must be installed on the host. The `nftables` driver (`firewall_driver = "nftables"`) was attempted but fails in LXD on WSL2 due to missing kernel modules.
 
 ### `OpenSSL` 3.0.x `-quiet` Flag (Test-Only)
 

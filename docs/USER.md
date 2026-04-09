@@ -29,7 +29,7 @@ The wrapper detects missing dependencies on first run and prints distro-specific
 | Distro | Install Command |
 |--------|-----------------|
 | Debian 12 | `sudo apt install iptables` |
-| CentOS 9 Stream / Fedora 42 | `sudo dnf install iptables-nft` |
+| CentOS 9 Stream / Fedora 43 | `sudo dnf install iptables-nft` |
 
 ## Networking: `slirp4netns` Instead of `pasta`
 

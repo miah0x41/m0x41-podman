@@ -122,12 +122,12 @@ Tested 2026-03-24. The snap runs on any Linux distribution with `glibc` >= 2.34 
 | Ubuntu 24.04 | 2.39 | Pass | `apt install uidmap dbus-user-session` |
 | Debian 12 | 2.36 | Pass | `apt install uidmap dbus-user-session` |
 | CentOS 9 Stream | 2.34 | Pass | `dnf install shadow-utils` |
-| Fedora 42 | 2.41 | Fail | — |
+| Fedora 43 | 2.41 | Fail | — |
 | Ubuntu 20.04 | 2.31 | Fail | — |
 
 Ubuntu Desktop includes `uidmap` and `dbus-user-session` by default. Server, minimal, and container images do not.
 
-Fedora 42 fails because `newuidmap` lacks the setuid bit inside LXD containers. This is an LXD/Fedora environment limitation — rootless would work on a real Fedora host with setuid `newuidmap`. Full Fedora validation on bare metal is pending.
+Fedora 43 fails because `newuidmap` lacks the setuid bit inside LXD containers. This is an LXD/Fedora environment limitation — rootless would work on a real Fedora host with setuid `newuidmap`. Full Fedora validation on bare metal is pending.
 
 Ubuntu 20.04 fails because `glibc` 2.31 is below the snap's minimum of 2.34.
 
@@ -139,10 +139,10 @@ Ubuntu 20.04 fails because `glibc` 2.31 is below the snap's minimum of 2.34.
 | Ubuntu 24.04 | 2.39 | Pass | None |
 | Debian 12 | 2.36 | Pass | `apt install iptables` |
 | CentOS 9 Stream | 2.34 | Pass | `dnf install iptables-nft` |
-| Fedora 42 | 2.41 | Pass | `dnf install iptables-nft` |
+| Fedora 43 | 2.41 | Pass | `dnf install iptables-nft` |
 | Ubuntu 20.04 | 2.31 | Fail | — |
 
-Debian 12, CentOS 9, and Fedora 42 require `iptables` on the host. `netavark` (the container network backend) calls `iptables` as a child process of `conmon`, which does not inherit the snap's `PATH`. These distros ship `nftables` natively and do not include an `iptables` command by default.
+Debian 12, CentOS 9, and Fedora 43 require `iptables` on the host. `netavark` (the container network backend) calls `iptables` as a child process of `conmon`, which does not inherit the snap's `PATH`. These distros ship `nftables` natively and do not include an `iptables` command by default.
 
 ## What's in the Snap
 

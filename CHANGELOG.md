@@ -28,7 +28,7 @@ Initial release.
 - Full Quadlet (systemd integration) support with auto-registered generators
 - Install hook places `podman` on PATH at `/usr/local/bin/podman`
 - Bundled man pages, systemd socket units, and container policy
-- Tested across Ubuntu 22.04, Ubuntu 24.04, Debian 12, CentOS 9 Stream, and Fedora 42
+- Tested across Ubuntu 22.04, Ubuntu 24.04, Debian 12, CentOS 9 Stream, and Fedora 43
 
 ### Patches Applied
 

@@ -90,7 +90,7 @@ The entire first-run and dependency check block is skipped when running as root 
 
 ## Testing
 
-The wrapper's behaviour is validated by a dedicated multi-distro test suite that runs across Ubuntu 22.04, Ubuntu 24.04, Debian 12, CentOS 9 Stream, and Fedora 42.
+The wrapper's behaviour is validated by a dedicated multi-distro test suite that runs across Ubuntu 22.04, Ubuntu 24.04, Debian 12, CentOS 9 Stream, and Fedora 43.
 
 ### Running Wrapper Tests
 
@@ -134,7 +134,7 @@ Tested 2026-03-24 on WSL2. All distros pass 18/18.
 | Ubuntu 24.04 | 18/18 pass |
 | Debian 12 | 18/18 pass |
 | CentOS 9 Stream | 18/18 pass |
-| Fedora 42 | 18/18 pass |
+| Fedora 43 | 18/18 pass |
 
 ### Test Environment Limitations
 

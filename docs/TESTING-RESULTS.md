@@ -81,12 +81,12 @@ The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and
 
 ### Non-Ubuntu Distros: Rootful Requires Host `iptables`
 
-`netavark` calls `iptables` as a child process of `conmon`, which does not inherit the snap wrapper's `PATH`. Ubuntu ships `iptables` by default; Debian 12, CentOS 9, and Fedora 42 use `nftables` and require a compatibility package:
+`netavark` calls `iptables` as a child process of `conmon`, which does not inherit the snap wrapper's `PATH`. Ubuntu ships `iptables` by default; Debian 12, CentOS 9, and Fedora 43 use `nftables` and require a compatibility package:
 
 | Distro | Package |
 |--------|---------|
 | Debian 12 | `apt install iptables` |
-| CentOS 9 / Fedora 42 | `dnf install iptables-nft` |
+| CentOS 9 / Fedora 43 | `dnf install iptables-nft` |
 
 Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fails in LXD on WSL2 due to missing kernel `nftables` modules. On hosts with full `nftables` support, this may work.
 
