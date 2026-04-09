@@ -144,7 +144,7 @@ Quadlet functionality is tested in tier 5 of the test suite.
 
 ### Test Results
 
-Tested 2026-03-25 on WSL2.
+Tested 2026-03-25.
 
 **Single distro (Ubuntu 24.04):** Tier 5 custom tests (5a-5d) 20/20 pass. BATS (5e) 68/73 — 5 failures in `252-quadlet.bats` (snap config conflicts + missing `htpasswd`). `251-system-service` (19/19) and `270-socket-activation` (3/3) pass fully.
 

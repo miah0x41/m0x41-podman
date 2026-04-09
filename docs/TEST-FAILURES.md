@@ -2,7 +2,7 @@
 
 This document records every known test failure in the `m0x41-podman` snap test suite, grouped by tier. Each failure indicates whether it occurs in LXC containers, LXD VMs, or both, along with the root cause classification.
 
-Tested 2026-04-06 on bare-metal KVM (VM) and 2026-03-25 on WSL2 (LXC). Ubuntu 24.04 in both environments.
+Tested 2026-04-06 on bare-metal KVM (VM). Ubuntu 24.04.
 
 ## Summary
 

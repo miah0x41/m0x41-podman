@@ -199,7 +199,7 @@ See [COMPONENTS.md](COMPONENTS.md#source-modifications) for details and [HEALTHC
 
 ### `podman machine`
 
-`podman machine` creates and manages VMs via QEMU. The snap does not bundle QEMU or the machine provider. If you need `podman machine` (common on macOS or WSL2 workflows), use a native _Podman_ install.
+`podman machine` creates and manages VMs via QEMU. The snap does not bundle QEMU or the machine provider. If you need `podman machine` (common on macOS workflows), use a native _Podman_ install.
 
 ### `podman compose`
 

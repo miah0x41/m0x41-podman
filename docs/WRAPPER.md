@@ -126,7 +126,7 @@ The wrapper's behaviour is validated by a dedicated multi-distro test suite that
 
 ### Test Results
 
-Tested 2026-03-24 on WSL2. All distros pass 18/18.
+All distros pass 18/18.
 
 | Distro | Result |
 |--------|--------|

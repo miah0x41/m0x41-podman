@@ -88,7 +88,7 @@ The snap bundles `libgpgme` but not its dependency `libgpg-error`. On Fedora and
 | Debian 12 | `apt install iptables` |
 | CentOS 9 / Fedora 43 | `dnf install iptables-nft` |
 
-Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fails in LXD on WSL2 due to missing kernel `nftables` modules. On hosts with full `nftables` support, this may work.
+Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fails in LXD due to missing kernel `nftables` modules. On hosts with full `nftables` support, this may work.
 
 ## Full Upstream BATS Suite
 
@@ -176,15 +176,7 @@ These tests can only run in a VM because they validate system-level side effects
 
 ## Test Environment
 
-Tests have been run on two hosts:
-
-**WSL2** (LXC container tests, 2026-03-25):
-
-- **Host**: WSL2 (Linux 6.6.87.2-microsoft-standard-WSL2)
-- **LXD**: 5.21.4 LTS (snap)
-- **LXC containers**: `security.nesting=true`, `security.syscalls.intercept.mknod=true`, `security.syscalls.intercept.setxattr=true`
-
-**Bare-metal** (VM tests, 2026-04-01):
+**Bare-metal** (2026-04-01):
 
 - **Host**: Intel i7-8700, 125 GB RAM, Linux 6.8.0-100-generic (Ubuntu)
 - **LXD**: 5.21.4 LTS (snap)
