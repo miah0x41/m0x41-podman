@@ -4,6 +4,25 @@ All notable changes to the `m0x41-podman` snap package are documented here.
 
 Version format: `{upstream_podman_version}+snap{N}` — the suffix tracks snap packaging revisions independent of the upstream _Podman_ release.
 
+## v5.8.1+snap2
+
+Supply-chain integrity for release artifacts.
+
+Every release now includes three verification mechanisms so that users can confirm the snap they downloaded is authentic, untampered, and built by this repository's GitHub Actions workflow:
+
+| Measure | Asset | What it proves |
+|---------|-------|----------------|
+| SHA256 checksum | `.sha256` | The file was not corrupted or modified after publication |
+| Cosign keyless signature | `.cosign-bundle` | The file was signed by this repository's CI using Sigstore OIDC — no long-lived keys |
+| SLSA provenance attestation | GitHub-native | The file was built by a specific workflow, from a specific commit, in this repository |
+
+### Changes
+
+- Build workflow generates SHA256 checksum, cosign keyless signature bundle, and SLSA provenance attestation for every release
+- All three verification artifacts are uploaded alongside the snap as release assets
+- README includes a Verification section with download and verification commands
+- No secrets or long-lived keys required — cosign uses GitHub's OIDC identity, attestations use the built-in workflow token
+
 ## v5.8.1+snap1
 
 Initial release.

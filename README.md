@@ -23,13 +23,38 @@ Download the latest release from [GitHub Releases](https://github.com/miah0x41/m
 ```bash
 # Download the latest release
 curl -fsSL -o m0x41-podman.snap \
-  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap1_amd64.snap"
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap"
 
 # Install
 sudo snap install m0x41-podman.snap --dangerous --classic
 ```
 
 The `--dangerous` flag is required because the snap is sideloaded from GitHub rather than the Snap Store (see [Snap Store Status](#snap-store-status)). The `--classic` flag grants the host filesystem access that _Podman_ requires for rootless operation and systemd integration.
+
+### Verification
+
+Each release includes a SHA256 checksum, a [cosign](https://docs.sigstore.dev/cosign/overview/) signature bundle, and a [SLSA provenance](https://slsa.dev/) attestation. These let you verify that the snap was not tampered with and was built by the GitHub Actions workflow in this repository.
+
+```bash
+# Download the checksum and signature bundle
+curl -fsSL -o m0x41-podman.snap.sha256 \
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap.sha256"
+curl -fsSL -o m0x41-podman.snap.cosign-bundle \
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap.cosign-bundle"
+
+# Integrity — verify the file was not corrupted or modified
+sha256sum -c m0x41-podman.snap.sha256
+
+# Authenticity — verify the file was signed by this repository's workflow (requires cosign)
+cosign verify-blob m0x41-podman.snap \
+  --bundle m0x41-podman.snap.cosign-bundle \
+  --certificate-identity-regexp "https://github.com/miah0x41/m0x41-podman" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+# Provenance — verify the file was built from a specific commit (requires gh >= 2.49.0)
+gh attestation verify m0x41-podman.snap \
+  --owner miah0x41
+```
 
 The snap's install hook places `podman` on PATH at `/usr/local/bin/podman` and registers systemd generators for Quadlet. Both happen automatically — no manual configuration needed.
 

@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
 
+permissions:
+  id-token: write
+  contents: write
+  attestations: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -21,7 +26,27 @@ jobs:
           mv ${{ steps.build.outputs.snap }} "m0x41-podman_${version}_amd64.snap"
           echo "snap_file=m0x41-podman_${version}_amd64.snap" >> "$GITHUB_ENV"
 
-      - name: Upload release asset
+      - name: Generate SHA256 checksum
+        run: sha256sum "${{ env.snap_file }}" > "${{ env.snap_file }}.sha256"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4
+
+      - name: Sign with cosign (keyless)
+        run: |
+          cosign sign-blob "${{ env.snap_file }}" \
+            --bundle "${{ env.snap_file }}.cosign-bundle" \
+            --yes
+
+      - name: Attest provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ env.snap_file }}
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.snap_file }}
+          files: |
+            ${{ env.snap_file }}
+            ${{ env.snap_file }}.sha256
+            ${{ env.snap_file }}.cosign-bundle
