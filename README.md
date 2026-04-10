@@ -244,7 +244,7 @@ snap/                           # Bundled container engine configuration
 scripts/                        # Build, test, upgrade, and multi-distro automation
 docs/
   USER.md                       # User guide: snap vs native Podman differences
-  DEVELOPMENT.md                # Build environment and script reference
+  DEVELOPMENT.md                # Build environment, script reference, and release process
   TESTING.md                    # Test methodology: tiers, how to run tests
   TESTING-RESULTS.md            # Recorded test results, known failures, BATS suite
   TEST-FAILURES.md              # All known failures by tier and environment (LXC vs VM)
@@ -263,7 +263,7 @@ docs/
 ```
 
 - **[docs/USER.md](docs/USER.md)** — User guide: all differences from native _Podman_, configuration, limitations
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment, prerequisites, script reference, architecture diagram
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Build environment, prerequisites, script reference, release process, architecture diagram
 - **[docs/TESTING.md](docs/TESTING.md)** — Test tiers, how to run tests
 - **[docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md)** — Recorded results, known failures, full upstream BATS suite analysis
 - **[docs/TEST-FAILURES.md](docs/TEST-FAILURES.md)** — All known failures by tier and environment (LXC vs VM)

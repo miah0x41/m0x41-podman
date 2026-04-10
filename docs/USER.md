@@ -175,7 +175,7 @@ Quadlet (`.container`, `.volume`, `.network`, `.kube` files) is fully supported.
 
 `podman generate systemd` is deprecated upstream. The snap's `PODMAN_BINARY` patch makes it functional — generated units correctly reference `/usr/local/bin/podman` (the shim) rather than revision-specific snap paths. However, Quadlet `.container` files are the recommended approach for new deployments.
 
-### Podman API Socket
+### _Podman_ API Socket
 
 The install hook registers `podman.socket` and `podman.service` unit files. Enable the socket with:
 

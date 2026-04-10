@@ -88,7 +88,7 @@ All scripts are in the `scripts/` directory.
 | `07_test_setup_multi.sh` | Test container | Distro-agnostic setup — detects the distro, installs `snapd` and prerequisites, installs the snap, creates the test user. Handles Ubuntu, Debian, Fedora, and CentOS/RHEL |
 | `08_wrapper_test_launch.sh` | Host | Launches five distro containers in parallel, runs wrapper dependency detection tests on each |
 | `09_wrapper_test_setup.sh` | Test container | Minimal setup — installs snap without rootless dependencies to create a "missing deps" scenario |
-| `10_wrapper_tests.sh` | Test container | 18-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
+| `10_wrapper_tests.sh` | Test container | 20-test suite validating wrapper hello message, dependency warnings, marker files, and alias detection |
 | `11_run_bats_full.sh` | Test container | Runs the full upstream BATS suite (78 files, 785 tests) with categorised failure classification. Accepts `root` or `rootless` |
 | `upgrade-snap.sh` | Host | Stops rootless services, removes the old snap with `--purge`, installs the new snap from a provided path, restarts services, and runs health checks (shim, quadlet, generators, healthcheck validation) |
 | `podman-wrapper` | Inside snap | Entry point script — sets `PATH`/`LD_LIBRARY_PATH`, detects missing deps, shows first-run guidance, then exec's _Podman_. See [WRAPPER.md](WRAPPER.md) |
@@ -144,6 +144,57 @@ The _Podman_ `BATS` test helpers use `-quiet` with `openssl req`, which was adde
 ### `AppArmor` User Namespace Restriction (Ubuntu 24.04)
 
 Ubuntu 24.04 restricts unprivileged user namespaces via `apparmor_restrict_unprivileged_userns=1`. _Podman_ itself is unaffected (uses setuid helpers), but `skopeo`'s `unshare()` call fails. The test setup disables this restriction where present.
+
+## Releasing
+
+### Versioning
+
+Version format: `{upstream_podman_version}+snap{N}` (e.g., `5.8.1+snap1`).
+
+- The `snapcraft.yaml` `version` field stays as the bare upstream version (e.g., `5.8.1`). This is what `snap info` and `snap list` display.
+- The snap packaging revision is tracked only in the GitHub release tag and the release asset filename.
+- Packaging-only changes bump the snap suffix: `5.8.1+snap2`.
+- A new upstream _Podman_ version resets the suffix: `5.9.0+snap1`.
+- GitHub release tags use a `v` prefix: `v5.8.1+snap1`.
+
+### Release Workflow
+
+Releases are built automatically by GitHub Actions (`.github/workflows/build-snap.yml`). The workflow triggers on release publish, builds the snap via `snapcore/action-build`, and attaches three artifacts to the release:
+
+| Asset | Purpose |
+|-------|---------|
+| `m0x41-podman_{version}_amd64.snap` | The snap package |
+| `m0x41-podman_{version}_amd64.snap.sha256` | SHA256 checksum for integrity verification |
+| `m0x41-podman_{version}_amd64.snap.cosign-bundle` | Cosign keyless signature for authenticity verification |
+
+A SLSA provenance attestation is also created via GitHub's artifact attestations, recording which workflow, repository, and commit produced the artifact.
+
+No long-lived secrets or keys are involved. Cosign uses GitHub's short-lived OIDC identity tokens, and provenance attestations use the built-in workflow token.
+
+### Creating a Release
+
+1. Update `CHANGELOG.md` with a new version entry.
+2. If the upstream _Podman_ version changed, update `snapcraft.yaml` (version field and `source-tag`), `README.md`, and test scripts.
+3. Commit and push to `main`.
+4. Create the release:
+
+```bash
+gh release create "v{version}" --title "v{version}" --notes-file /dev/stdin <<'EOF'
+{release notes body}
+EOF
+```
+
+The release title must be the version tag (e.g., `v5.8.1+snap2`). The release body provides the context.
+
+### Naming Conventions
+
+| Item | Format | Example |
+|------|--------|---------|
+| Release tag | `v{version}` | `v5.8.1+snap2` |
+| Release title | `v{version}` | `v5.8.1+snap2` |
+| Snap filename | `m0x41-podman_{version}_amd64.snap` | `m0x41-podman_5.8.1+snap2_amd64.snap` |
+| Checksum | `{snap filename}.sha256` | `m0x41-podman_5.8.1+snap2_amd64.snap.sha256` |
+| Signature bundle | `{snap filename}.cosign-bundle` | `m0x41-podman_5.8.1+snap2_amd64.snap.cosign-bundle` |
 
 ## Modifying the Snap
 

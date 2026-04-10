@@ -73,7 +73,7 @@ In LXC: 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact
 
 ### Rootless Requires Host `uidmap` and `dbus-user-session`
 
-The snap does not bundle `uidmap` (`newuidmap`/`newgidmap`) or `dbus-user-session` — these must exist on the host and are accessed through classic confinement. `uidmap` provides the setuid binaries for user namespace creation; `dbus-user-session` provides the D-Bus user session bus needed by `loginctl enable-linger` and rootless Podman for `XDG_RUNTIME_DIR`. Ubuntu Desktop installs both by default, but server, minimal, and container images do not. Without them, rootless operations fail. Install with `sudo apt install uidmap dbus-user-session` (Debian/Ubuntu) or `sudo dnf install shadow-utils` (Fedora/CentOS).
+The snap does not bundle `uidmap` (`newuidmap`/`newgidmap`) or `dbus-user-session` — these must exist on the host and are accessed through classic confinement. `uidmap` provides the setuid binaries for user namespace creation; `dbus-user-session` provides the D-Bus user session bus needed by `loginctl enable-linger` and rootless _Podman_ for `XDG_RUNTIME_DIR`. Ubuntu Desktop installs both by default, but server, minimal, and container images do not. Without them, rootless operations fail. Install with `sudo apt install uidmap dbus-user-session` (Debian/Ubuntu) or `sudo dnf install shadow-utils` (Fedora/CentOS).
 
 ### Fedora/CentOS Requires Host `libgpg-error`
 

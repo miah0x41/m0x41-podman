@@ -139,8 +139,8 @@ Quadlet functionality is tested in tier 5 of the test suite.
 | 5b | 3 | Quadlet dry-run: valid unit generation, correct ExecStart path |
 | 5c | 2 | Live rootful Quadlet: systemd service starts and runs |
 | 5d | 2 | Live rootless Quadlet: systemd user service starts and runs |
-| 5e | 73 | Upstream BATS: `251-system-service` (19), `270-socket-activation` (3), `252-254` quadlet (51). Gated on BATS + Podman source |
-| 5f | ~160 | Go e2e quadlet tests (gated on Go + Podman source) |
+| 5e | 73 | Upstream BATS: `251-system-service` (19), `270-socket-activation` (3), `252-254` quadlet (51). Gated on BATS + _Podman_ source |
+| 5f | ~160 | Go e2e quadlet tests (gated on Go + _Podman_ source) |
 
 ### Test Results
 
