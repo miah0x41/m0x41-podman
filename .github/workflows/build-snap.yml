@@ -30,7 +30,7 @@ jobs:
         run: sha256sum "${{ env.snap_file }}" > "${{ env.snap_file }}.sha256"
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.1
 
       - name: Sign with cosign (keyless)
         run: |
