@@ -1,20 +1,28 @@
-# Unofficial Podman Snap Package
+<div align="center">
+
+# m0x41-podman
+
+#### Unofficial _Podman_ snap package with full _Quadlet_ support — classic confinement on `core22`.
+
+[![Build](https://img.shields.io/github/actions/workflow/status/miah0x41/m0x41-podman/build-snap.yml?label=build&logo=github)](https://github.com/miah0x41/m0x41-podman/actions/workflows/build-snap.yml)
+[![Release](https://img.shields.io/github/v/release/miah0x41/m0x41-podman?logo=github)](https://github.com/miah0x41/m0x41-podman/releases/latest)
+[![License](https://img.shields.io/github/license/miah0x41/m0x41-podman)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/miah0x41/m0x41-podman/total?logo=github&label=downloads)](https://github.com/miah0x41/m0x41-podman/releases)
+[![Stars](https://img.shields.io/github/stars/miah0x41/m0x41-podman?logo=github)](https://github.com/miah0x41/m0x41-podman/stargazers)
+
+[![Podman](https://img.shields.io/badge/Podman-v5.8.1-892CA0?logo=podman&logoColor=white)](https://github.com/containers/podman)
+[![snap base](https://img.shields.io/badge/snap%20base-core22-E95420?logo=ubuntu&logoColor=white)](https://snapcraft.io/docs/base-snaps)
+[![Platform](https://img.shields.io/badge/platform-linux--amd64-informational)](#distro-compatibility)
+[![Signed](https://img.shields.io/badge/signed-cosign-blue?logo=sigstore&logoColor=white)](#verification)
+[![SLSA](https://img.shields.io/badge/SLSA-Level%203-green)](https://slsa.dev/)
+
+[Installation](#installation) • [Quadlet](#quadlet-systemd-integration) • [Compatibility](#distro-compatibility) • [Differences](#differences-from-native-podman) • [Documentation](#documentation) • [Releases](https://github.com/miah0x41/m0x41-podman/releases)
+
+</div>
+
+---
 
 _Podman_ v5.8.1 with full _Quadlet_ (systemd integration) support, packaged as a classic confinement snap on `core22` (Ubuntu 22.04). Bundles all runtime dependencies — no additional packages needed on the host beyond `uidmap` for rootless mode. Tested end-to-end across five Linux distributions in both _rootless_ and _rootful_ modes.
-
-This project exists because there is no official _Podman_ snap, and previous community attempts have stalled:
-
-- [Snap Package](https://github.com/containers/podman/discussions/14360) issue on `containers/podman`. Maintainer comment from 2022: _"This is an opensource project, if community wants to maintain SNAP or Flatpak we are fine with that."_
-- [Podman Snap Store Listing](https://snapcraft.io/podman) — non-functional listing from 2020.
-- [Forum Discussion](https://forum.snapcraft.io/t/running-snapcraft-with-podman/9016) from Dec 2018.
-- [podman-snap](https://github.com/abitrolly/podman-snap) attempt from 2019.
-- [Forum Discussion](https://forum.snapcraft.io/t/is-anyone-working-on-a-newer-snap-for-podman/28594) from Feb 2022.
-- [Forum Discussion](https://forum.snapcraft.io/t/please-remove-defunct-snap-store-listing/34289) from Mar 2023.
-- [Forum Discussion](https://forum.snapcraft.io/t/need-podman-app/38450) from Jan 2024.
-
-## Potential Related Projects
-
-- [mgoltzsche/podman-static](https://github.com/mgoltzsche/podman-static?tab=readme-ov-file) — _Podman_ static builds.
 
 ## Installation
 
@@ -30,6 +38,16 @@ sudo snap install m0x41-podman.snap --dangerous --classic
 ```
 
 The `--dangerous` flag is required because the snap is sideloaded from GitHub rather than the Snap Store (see [Snap Store Status](#snap-store-status)). The `--classic` flag grants the host filesystem access that _Podman_ requires for rootless operation and systemd integration.
+
+The snap's install hook places `podman` on PATH at `/usr/local/bin/podman` and registers systemd generators for Quadlet. Both happen automatically — no manual configuration needed.
+
+> **Note:** If you already have `podman` installed via `apt` or another package manager, the snap's `/usr/local/bin/podman` will take precedence on PATH (since `/usr/local/bin` is searched before `/usr/bin`). Remove the existing installation first, or use the snap command name `m0x41-podman` to avoid conflicts.
+
+```bash
+podman run --rm docker.io/library/alpine echo "hello from snap"
+```
+
+For rootless mode on server or minimal installs, you may need: `sudo apt install uidmap dbus-user-session`
 
 ### Verification
 
@@ -56,16 +74,6 @@ gh attestation verify m0x41-podman.snap \
   --owner miah0x41
 ```
 
-The snap's install hook places `podman` on PATH at `/usr/local/bin/podman` and registers systemd generators for Quadlet. Both happen automatically — no manual configuration needed.
-
-> **Note:** If you already have `podman` installed via `apt` or another package manager, the snap's `/usr/local/bin/podman` will take precedence on PATH (since `/usr/local/bin` is searched before `/usr/bin`). Remove the existing installation first, or use the snap command name `m0x41-podman` to avoid conflicts.
-
-```bash
-podman run --rm docker.io/library/alpine echo "hello from snap"
-```
-
-For rootless mode on server or minimal installs, you may need: `sudo apt install uidmap dbus-user-session`
-
 ### Podman API Socket
 
 Tools like Traefik, Dozzle, and Beszel require the Podman API socket. The install hook registers the socket unit files; enable the socket with:
@@ -87,28 +95,6 @@ systemctl --user restart podman.socket
 ```
 
 Then restart your container services. If you had previously enabled `podman.socket`, re-enable it — the snap provides its own unit files that replace the ones removed with the `apt` package.
-
-## Differences from Native _Podman_
-
-The snap is not a drop-in replacement for a natively installed _Podman_. These are the most significant differences — see [docs/USER.md](docs/USER.md) for the complete user guide.
-
-**Rootless networking uses `slirp4netns`, not `pasta`.** Native _Podman_ v5.x defaults to `pasta` for faster rootless networking. The snap uses `slirp4netns` because `pasta` is not available on the `core22` base. Rootless networking works but may be slower, and `--network pasta` will fail.
-
-**Configuration files in standard locations are ignored.** The snap sets `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` to point to its own bundled configs. Any `containers.conf`, `storage.conf`, or `registries.conf` you place in `~/.config/containers/` or `/etc/containers/` will not be loaded. To customise `containers.conf` settings, use `CONTAINERS_CONF_OVERRIDE`:
-
-```bash
-export CONTAINERS_CONF_OVERRIDE="$HOME/.config/containers/overrides.conf"
-```
-
-There is no override mechanism for `storage.conf` or `registries.conf`. See [docs/USER.md](docs/USER.md#configuration) for which settings are safe to override and which will break the snap.
-
-**Rootless mode requires host packages.** `uidmap` and `dbus-user-session` cannot be bundled (they require setuid bits and a system D-Bus service). Non-Ubuntu distros also need `iptables` for rootful networking. See [Distro Compatibility](#distro-compatibility) for per-distro install commands.
-
-**Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` is deprecated upstream — it works with the snap's `PODMAN_BINARY` patch but Quadlet is the preferred path forward.
-
-**The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, installs corrected systemd units, and symlinks man pages. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list. If a previous native _Podman_ installation is detected, the hook warns about stale artefacts and suggests cleanup — see [Replacing a Native Podman Install](docs/USER.md#replacing-a-native-podman-install).
-
-**Architecture is `amd64` only** with a `glibc` >= 2.34 floor. Distros older than ~2021 are not supported.
 
 ## Quadlet (Systemd Integration)
 
@@ -134,6 +120,28 @@ Quadlet has been validated end-to-end: the snap's install hook creates a `/usr/l
 See [docs/QUADLET.md](docs/QUADLET.md) for rootless usage, file locations, the shim vs wrapper distinction, and detailed test results.
 
 > **Note:** `podman generate systemd` is deprecated upstream. The snap's `PODMAN_BINARY` patch makes it functional (generated units correctly reference the shim), but Quadlet is the supported path forward. Use Quadlet `.container` files for new deployments.
+
+## Differences from Native _Podman_
+
+The snap is not a drop-in replacement for a natively installed _Podman_. These are the most significant differences — see [docs/USER.md](docs/USER.md) for the complete user guide.
+
+**Rootless networking uses `slirp4netns`, not `pasta`.** Native _Podman_ v5.x defaults to `pasta` for faster rootless networking. The snap uses `slirp4netns` because `pasta` is not available on the `core22` base. Rootless networking works but may be slower, and `--network pasta` will fail.
+
+**Configuration files in standard locations are ignored.** The snap sets `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` to point to its own bundled configs. Any `containers.conf`, `storage.conf`, or `registries.conf` you place in `~/.config/containers/` or `/etc/containers/` will not be loaded. To customise `containers.conf` settings, use `CONTAINERS_CONF_OVERRIDE`:
+
+```bash
+export CONTAINERS_CONF_OVERRIDE="$HOME/.config/containers/overrides.conf"
+```
+
+There is no override mechanism for `storage.conf` or `registries.conf`. See [docs/USER.md](docs/USER.md#configuration) for which settings are safe to override and which will break the snap.
+
+**Rootless mode requires host packages.** `uidmap` and `dbus-user-session` cannot be bundled (they require setuid bits and a system D-Bus service). Non-Ubuntu distros also need `iptables` for rootful networking. See [Distro Compatibility](#distro-compatibility) for per-distro install commands.
+
+**Some features are not supported.** `podman machine`, `podman compose`, checkpoint/restore, and SELinux are not available. `podman generate systemd` is deprecated upstream — it works with the snap's `PODMAN_BINARY` patch but Quadlet is the preferred path forward.
+
+**The install hook writes to the host filesystem.** It creates a shim at `/usr/local/bin/podman`, registers systemd generators, installs corrected systemd units, and symlinks man pages. See [docs/USER.md](docs/USER.md#install-hook-side-effects) for the full list. If a previous native _Podman_ installation is detected, the hook warns about stale artefacts and suggests cleanup — see [Replacing a Native Podman Install](docs/USER.md#replacing-a-native-podman-install).
+
+**Architecture is `amd64` only** with a `glibc` >= 2.34 floor. Distros older than ~2021 are not supported.
 
 ## Distro Compatibility
 
@@ -189,16 +197,6 @@ The snap's install hook automatically:
 
 See [docs/COMPONENTS.md](docs/COMPONENTS.md) for full details including licenses and upstream links.
 
-## Build
-
-Requires LXD. The build runs inside an LXD container — no root access needed on the host.
-
-```bash
-/usr/bin/sg lxd -c "./scripts/01_launch.sh"
-```
-
-This creates an LXD container, builds the snap with `snapcraft --destructive-mode`, and pulls the `.snap` file back to the host. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build details, script reference, and compatibility issues.
-
 ## Testing
 
 The snap is validated with a seven-tier test suite covering command validation, rootless and rootful functional tests, upstream BATS parity, Quadlet/install hook validation, host-side impact, and the full upstream BATS suite. Tiers 1-5 form the core regression suite. Tier 6 requires a VM. Tier 7 is on-demand.
@@ -215,6 +213,16 @@ The snap is validated with a seven-tier test suite covering command validation, 
 
 The full upstream BATS suite (78 files, 785 tests) can also be run against the snap. Of those, 180 are skipped by the test harness — tests for `pasta` networking (the snap bundles `slirp4netns` instead), SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **605 applicable tests** that run in root mode, **559 pass (92%)** unmodified. A second adapted pass — where the shim respects pre-existing config env vars — recovers 5 more, for **564/605 (93%)**. The `PODMAN_BINARY` patch recovers a further 16 tests (`generate systemd` and `runlabel` binary path failures), bringing the combined total to **~580/605 (~96%)**. The remaining ~25 residual failures are snap-specific: config env var override, missing infrastructure, and timing. In rootless mode, the same `pasta` tests that skip in root mode instead fail (91 tests), inflating the raw failure count. Excluding these, rootless passes **511/611 applicable tests (84%)**. See [docs/TEST-FAILURES.md](docs/TEST-FAILURES.md) for the full per-tier breakdown, [docs/TESTING.md](docs/TESTING.md) for the methodology, and [docs/TESTING-RESULTS.md](docs/TESTING-RESULTS.md) for recorded results.
 
+## Build
+
+Requires LXD. The build runs inside an LXD container — no root access needed on the host.
+
+```bash
+/usr/bin/sg lxd -c "./scripts/01_launch.sh"
+```
+
+This creates an LXD container, builds the snap with `snapcraft --destructive-mode`, and pulls the `.snap` file back to the host. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build details, script reference, and compatibility issues.
+
 ## Why Classic Confinement?
 
 Snap strict confinement replaces `/usr/bin` with the base snap's copy. The host's setuid `newuidmap` and `newgidmap` (from the `uidmap` package) — required for rootless user namespace creation — become invisible. Staging them inside the snap doesn't help: `snapcraft` strips setuid bits, and `squashfs` mounts with `nosuid`. Classic confinement also enables the install hook to register systemd generators for Quadlet and place the `podman` shim on PATH — operations that strict confinement does not permit. See [docs/CLASSIC_CONFINEMENT.md](docs/CLASSIC_CONFINEMENT.md) for the full technical justification and evaluation of existing snapd interfaces.
@@ -229,11 +237,37 @@ This means automatic updates via `snapd` are not available. To upgrade, download
 sudo snap install m0x41-podman_<version>_amd64.snap --dangerous --classic
 ```
 
-## Community Adoption
+## Background
 
-This repository is licensed under the [Apache License 2.0](LICENSE). Anyone in the snapcraft community is welcome to fork this repository and maintain a _Podman_ snap under their own name or as part of an official effort. If a formally maintained _Podman_ snap becomes available on the Snap Store, this repository will be deprecated in its favour.
+This project exists because there is no official _Podman_ snap, and previous community attempts have stalled.
 
-## Repository Structure and Documentation
+<details>
+<summary>Previous attempts and forum discussions</summary>
+
+- [Snap Package](https://github.com/containers/podman/discussions/14360) issue on `containers/podman`. Maintainer comment from 2022: _"This is an opensource project, if community wants to maintain SNAP or Flatpak we are fine with that."_
+- [Podman Snap Store Listing](https://snapcraft.io/podman) — non-functional listing from 2020.
+- [Forum Discussion](https://forum.snapcraft.io/t/running-snapcraft-with-podman/9016) from Dec 2018.
+- [podman-snap](https://github.com/abitrolly/podman-snap) attempt from 2019.
+- [Forum Discussion](https://forum.snapcraft.io/t/is-anyone-working-on-a-newer-snap-for-podman/28594) from Feb 2022.
+- [Forum Discussion](https://forum.snapcraft.io/t/please-remove-defunct-snap-store-listing/34289) from Mar 2023.
+- [Forum Discussion](https://forum.snapcraft.io/t/need-podman-app/38450) from Jan 2024.
+
+</details>
+
+**Related projects**
+
+- [mgoltzsche/podman-static](https://github.com/mgoltzsche/podman-static?tab=readme-ov-file) — _Podman_ static builds.
+
+## Feedback and Community Adoption
+
+Pull requests are not being accepted — this repository is maintained as a personal packaging effort. Feedback, bug reports, and feature requests are welcome:
+
+- **Bugs and feature requests** — [Open an issue](https://github.com/miah0x41/m0x41-podman/issues)
+- **General discussion** — [Snapcraft forum thread](https://forum.snapcraft.io/t/m0x41-podman-unofficial-podman-snap-package/50805)
+
+This repository is licensed under the [Apache License 2.0](LICENSE). Anyone in the snapcraft community is welcome to fork it and maintain a _Podman_ snap under their own name or as part of an official effort. If a formally maintained _Podman_ snap becomes available on the Snap Store, this repository will be deprecated in its favour.
+
+## Documentation
 
 ```
 snapcraft.yaml                  # Snap definition (core22, classic confinement)
