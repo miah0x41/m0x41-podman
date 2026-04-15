@@ -334,7 +334,7 @@ Any hardcoded revision paths (e.g. manual scripts referencing `/snap/m0x41-podma
 
 ## Quick Reference
 
-| Aspect | Native _Podman_ v5.8.1 | `m0x41-podman` Snap |
+| Aspect | Native _Podman_ v5.8.2 | `m0x41-podman` Snap |
 |--------|------------------------|---------------------|
 | Rootless networking | `pasta` (default) | `slirp4netns` |
 | Config loading | Cascade (`~/.config/`, `/etc/`) | Snap-bundled only; use `CONTAINERS_CONF_OVERRIDE` |

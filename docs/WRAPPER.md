@@ -13,7 +13,7 @@ The wrapper prepends the snap's binary and library directories to `PATH` and `LD
 On the first _rootless_ invocation, the wrapper prints a welcome message to `stderr`:
 
 ```bash
-  Welcome to m0x41-podman (Podman v5.8.1)
+  Welcome to m0x41-podman (Podman v5.8.2)
 
   Tip: alias as 'podman' for convenience:
     sudo snap alias m0x41-podman podman

@@ -36,8 +36,8 @@ tier1() {
     echo "===== TIER 1: Snap Command Validation ====="
 
     echo "--- snap command reports version ---"
-    if ${PODMAN} --version 2>&1 | grep -q "5.8.1"; then
-        pass "snap command reports 5.8.1"
+    if ${PODMAN} --version 2>&1 | grep -q "5.8.2"; then
+        pass "snap command reports 5.8.2"
     else
         fail "snap command version check"
     fi
@@ -268,8 +268,8 @@ tier5() {
     fi
 
     echo "--- shim reports correct version ---"
-    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.1"; then
-        pass "shim reports 5.8.1"
+    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.2"; then
+        pass "shim reports 5.8.2"
     else
         fail "shim version check"
     fi
@@ -422,12 +422,50 @@ CEOF
     fi
 
     echo "--- quadlet version matches ---"
-    if "${QUADLET}" --version 2>&1 | grep -q "5.8.1"; then
-        pass "quadlet version is 5.8.1"
+    if "${QUADLET}" --version 2>&1 | grep -q "5.8.2"; then
+        pass "quadlet version is 5.8.2"
     else
         fail "quadlet version mismatch"
     fi
     rm -rf "${QUADLET_TMPDIR}"
+
+    # --- 5b2: Quadlet Entrypoint= clearing (upstream #28213, fixed in v5.8.2) ---
+    echo ""
+    echo "--- 5b2: Quadlet Entrypoint= clearing ---"
+
+    EMPTY_EP_DIR=$(mktemp -d)
+    cat > "${EMPTY_EP_DIR}/entrypoint-empty.container" <<'CEOF'
+[Container]
+Image=docker.io/library/alpine
+Entrypoint=
+CEOF
+    EMPTY_EP_OUT=$(QUADLET_UNIT_DIRS="${EMPTY_EP_DIR}" "${QUADLET}" -dryrun 2>/dev/null || true)
+    if echo "${EMPTY_EP_OUT}" | grep -F -- '--entrypoint' >/dev/null; then
+        pass "empty Entrypoint= propagated as --entrypoint to podman run"
+    else
+        fail "empty Entrypoint= silently dropped (regression of #28213)"
+    fi
+    rm -rf "${EMPTY_EP_DIR}"
+
+    # --- 5b3: Quadlet HealthCmd with embedded double-quotes (upstream #28409, fixed in v5.8.2) ---
+    echo ""
+    echo "--- 5b3: Quadlet HealthCmd double-quote handling ---"
+
+    HC_DIR=$(mktemp -d)
+    cat > "${HC_DIR}/health-cmd-quotes.container" <<'CEOF'
+[Container]
+Image=docker.io/library/alpine
+HealthCmd=/bin/sh -c "echo 'hello world!'"
+CEOF
+    HC_OUT=$(QUADLET_UNIT_DIRS="${HC_DIR}" "${QUADLET}" -dryrun 2>/dev/null || true)
+    # On v5.8.1 the trailing \" is stripped, leaving ...hello\x20world!'"
+    # On v5.8.2 the full escape is preserved: ...hello\x20world!'\""
+    if echo "${HC_OUT}" | grep -F $'\'\\""' >/dev/null; then
+        pass "HealthCmd double-quotes preserved in generated ExecStart"
+    else
+        fail "HealthCmd trailing double-quote stripped (regression of #28409)"
+    fi
+    rm -rf "${HC_DIR}"
 
     # --- 5c: Live Quadlet rootful ---
     echo ""
@@ -864,14 +902,14 @@ tier6() {
         fi
 
         echo "--- podman functional after reboot ---"
-        if ${PODMAN} --version 2>&1 | grep -q "5.8.1"; then
+        if ${PODMAN} --version 2>&1 | grep -q "5.8.2"; then
             pass "podman version correct after reboot"
         else
             fail "podman version check failed after reboot"
         fi
 
         echo "--- shim survives reboot ---"
-        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.1"; then
+        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.2"; then
             pass "shim functional after reboot"
         else
             fail "shim broken after reboot"
@@ -914,7 +952,7 @@ tier6() {
         fi
 
         echo "--- quadlet still works after reboot ---"
-        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.1"; then
+        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.2"; then
             pass "quadlet functional after reboot"
         else
             fail "quadlet broken after reboot"

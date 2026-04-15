@@ -15,7 +15,7 @@ fi
 SNAP_FILE="${1:-}"
 if [ -z "${SNAP_FILE}" ] || [ ! -f "${SNAP_FILE}" ]; then
     echo "Usage: $0 <path-to-snap-file>"
-    echo "  e.g. $0 m0x41-podman_5.8.1+20260407.g03c0a7f_amd64.snap"
+    echo "  e.g. $0 m0x41-podman_5.8.2+snap1_amd64.snap"
     exit 1
 fi
 

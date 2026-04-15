@@ -11,7 +11,7 @@ The snap is validated with a seven-tier test suite. Tiers 1-5 form the core regr
 | 1 | Snap Command Validation | 7 | The snap binary runs, reports correct versions, and finds all bundled components (`crun`, `netavark`, `conmon`, overlay driver, config paths) |
 | 2 | Rootless Functional | 8 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping — all as an unprivileged user |
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
-| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.1 source tree, with `PODMAN` pointed at the snap binary |
+| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.2 source tree, with `PODMAN` pointed at the snap binary |
 | 5 | Quadlet / Install Hook | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), healthcheck transient unit validation, Go e2e quadlet tests (gated) |
 | 6 | Host-Side Impact (VM) | 25+ | Network integrity, [library path poisoning](investigations/RCCA-LIBRARY-POISONING.md), systemd health, reboot survival, snap removal cleanup — requires full VM |
 | 7 | Full Upstream BATS (on-demand) | 785 | All upstream `test/system/*.bats` files in both root and rootless modes, with categorised failure classification |

@@ -6,8 +6,9 @@ CLAUDE.md
 *.snap
 *.snap.xdelta3
 
-# Multi-distro test output
+# Multi-distro and wrapper test output
 multi-distro-results.txt
+wrapper-test-results.txt
 
 # Scratch files
 text.txt

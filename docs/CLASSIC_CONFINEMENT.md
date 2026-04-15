@@ -3,7 +3,7 @@
 ## Request
 
 - **name**: m0x41-podman
-- **description**: Podman v5.8.1 container engine with all runtime dependencies bundled (crun, conmon, netavark, aardvark-dns, fuse-overlayfs, slirp4netns, catatonit). Supports _rootless_ and _rootful_ operation, including _Quadlet_ (systemd integration). Built on core22.
+- **description**: Podman v5.8.2 container engine with all runtime dependencies bundled (crun, conmon, netavark, aardvark-dns, fuse-overlayfs, slirp4netns, catatonit). Supports _rootless_ and _rootful_ operation, including _Quadlet_ (systemd integration). Built on core22.
 - **snapcraft**: https://github.com/miah0x41/m0x41-podman/blob/main/snapcraft.yaml
 - **upstream**: https://github.com/containers/podman
 - **upstream-relation**: No upstream affiliation, I'm an independent packager. This snap packages unmodified upstream sources.

@@ -4,6 +4,25 @@ All notable changes to the `m0x41-podman` snap package are documented here.
 
 Version format: `{upstream_podman_version}+snap{N}` — the suffix tracks snap packaging revisions independent of the upstream _Podman_ release.
 
+## v5.8.2+snap1
+
+Upstream bump to _Podman_ v5.8.2. No packaging changes.
+
+**Upstream:** [Podman v5.8.2 release notes](https://github.com/containers/podman/releases/tag/v5.8.2)
+
+Upstream v5.8.2 is a security and bug-fix release. The security fix (CVE-2026-33414, `podman machine init --image` Powershell injection on Windows/Hyper-V) does not affect this snap, which targets Linux only and does not ship `podman machine`. The user-visible bug fixes relevant to this snap are:
+
+- `unless-stopped` containers now restart correctly after reboot when `podman-restart.service` is enabled ([#28152](https://github.com/containers/podman/issues/28152))
+- Quadlet `.container` files with `Entrypoint=` (empty value) now correctly clear the image's default entrypoint ([#28213](https://github.com/containers/podman/issues/28213))
+- Quadlet `.container` files with `HealthCmd` values containing embedded double-quotes now produce functional healthchecks ([#28409](https://github.com/containers/podman/issues/28409))
+
+### Changes
+
+- `snapcraft.yaml` `version` and `source-tag` updated to `5.8.2` / `v5.8.2`
+- `patches/generate-systemd-binary-path.patch` regenerated against v5.8.2 (applies cleanly with zero fuzz; no functional change). `patches/healthcheck-ld-library-path.patch` is unchanged
+- Tier 5 regression suite gains two Quadlet dry-run assertions covering the `Entrypoint=` clearing fix (#28213) and the `HealthCmd` double-quote fix (#28409). Both assertions were validated against the v5.8.1+snap2 release artifact to confirm they fail on the unfixed build
+- All current-version references across `README.md`, `docs/`, and test scripts bumped from v5.8.1 to v5.8.2. Post-incident investigation documents (`docs/investigations/`) retain their original v5.8.1 references, since they describe historical analysis performed against that source tree
+
 ## v5.8.1+snap2
 
 Supply-chain integrity for release artifacts.
