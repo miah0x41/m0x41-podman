@@ -15,7 +15,7 @@ SNAP_REV=$(basename "$(readlink -f /snap/m0x41-podman/current)")
 # `snap run`. On Ubuntu, `snap run` may swallow the wrapper's stderr.
 # This tests the wrapper logic itself, which is the purpose of this suite.
 SNAP="/snap/m0x41-podman/current"
-PODMAN_ENV="SNAP=${SNAP} SNAP_VERSION=5.8.1 SNAP_REVISION=${SNAP_REV}"
+PODMAN_ENV="SNAP=${SNAP} SNAP_VERSION=5.8.2 SNAP_REVISION=${SNAP_REV}"
 PODMAN_CMD="${SNAP}/bin/podman-wrapper"
 
 pass() { echo "  PASS: $1"; }

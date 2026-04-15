@@ -1,33 +1,10 @@
---- a/pkg/systemd/generate/containers.go
-+++ b/pkg/systemd/generate/containers.go
-@@ -300,6 +300,10 @@
- 		if err != nil {
- 			executable = "/usr/bin/podman"
- 			logrus.Warnf("Could not obtain podman executable location, using default %s", executable)
- 		}
-+		// Allow snap/wrapper environments to override the resolved binary path.
-+		if override := os.Getenv("PODMAN_BINARY"); override != "" {
-+			executable = override
-+		}
- 		info.Executable = executable
- 	}
---- a/pkg/systemd/generate/pods.go
-+++ b/pkg/systemd/generate/pods.go
-@@ -285,6 +285,10 @@
- 		if err != nil {
- 			executable = "/usr/bin/podman"
- 			logrus.Warnf("Could not obtain podman executable location, using default %s: %v", executable, err)
- 		}
-+		// Allow snap/wrapper environments to override the resolved binary path.
-+		if override := os.Getenv("PODMAN_BINARY"); override != "" {
-+			executable = override
-+		}
- 		info.Executable = executable
- 	}
+diff --git a/pkg/domain/infra/abi/containers_runlabel.go b/pkg/domain/infra/abi/containers_runlabel.go
+index baa957d0f..e0c0fad90 100644
 --- a/pkg/domain/infra/abi/containers_runlabel.go
 +++ b/pkg/domain/infra/abi/containers_runlabel.go
-@@ -72,7 +72,12 @@
-
+@@ -70,7 +70,12 @@ func (ic *ContainerEngine) ContainerRunlabel(ctx context.Context, label string,
+ 	}
+ 
  	if options.Display {
 -		fmt.Printf("command: %s\n", strings.Join(append([]string{os.Args[0]}, cmd[1:]...), " "))
 +		displayBin := os.Args[0]
@@ -38,3 +15,34 @@
 +		fmt.Printf("command: %s\n", strings.Join(append([]string{displayBin}, cmd[1:]...), " "))
  		return nil
  	}
+ 
+diff --git a/pkg/systemd/generate/containers.go b/pkg/systemd/generate/containers.go
+index 7878f80fb..e01f05793 100644
+--- a/pkg/systemd/generate/containers.go
++++ b/pkg/systemd/generate/containers.go
+@@ -303,6 +303,10 @@ func executeContainerTemplate(info *containerInfo, options entities.GenerateSyst
+ 			executable = "/usr/bin/podman"
+ 			logrus.Warnf("Could not obtain podman executable location, using default %s", executable)
+ 		}
++		// Allow snap/wrapper environments to override the resolved binary path.
++		if override := os.Getenv("PODMAN_BINARY"); override != "" {
++			executable = override
++		}
+ 		info.Executable = executable
+ 	}
+ 
+diff --git a/pkg/systemd/generate/pods.go b/pkg/systemd/generate/pods.go
+index 81ca410bd..240b5bc58 100644
+--- a/pkg/systemd/generate/pods.go
++++ b/pkg/systemd/generate/pods.go
+@@ -288,6 +288,10 @@ func executePodTemplate(info *podInfo, options entities.GenerateSystemdOptions)
+ 			executable = "/usr/bin/podman"
+ 			logrus.Warnf("Could not obtain podman executable location, using default %s: %v", executable, err)
+ 		}
++		// Allow snap/wrapper environments to override the resolved binary path.
++		if override := os.Getenv("PODMAN_BINARY"); override != "" {
++			executable = override
++		}
+ 		info.Executable = executable
+ 	}
+ 

@@ -10,7 +10,7 @@ Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 | 2 | 8/8 pass | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
 | 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
 | 4 | 29/31 | 29/31 | `BATS` parity — 2 snap-specific failures (see [Known Failures](#known-failures)) |
-| 5a-5d,5g | 48/48 pass | 48/48 pass | Install hook, Quadlet dry-run, live rootful/rootless Quadlet, healthcheck transient unit validation |
+| 5a-5d,5g | 50/50 pass | 50/50 pass | Install hook, Quadlet dry-run (incl. Entrypoint= clearing and HealthCmd quote regression assertions), live rootful/rootless Quadlet, healthcheck transient unit validation |
 | 5e | 68/73 | 71/73 | `BATS` system-service, socket-activation, quadlet 252-254 |
 | 6 | — | 31/31 pass | Host-side impact: network, ldconfig, systemd, reboot, removal |
 
@@ -18,13 +18,13 @@ Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
 All distros run in parallel via `06_test_multi_distro.sh`.
 
-| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (48) |
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (50) |
 |--------|---------|------------|------------|------------|-------------|
-| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 48/48 |
-| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 48/48 |
-| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 48/48 |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 48/48 |
-| Fedora 43 | 2.41 | 5/7 | 1/8 | 6/6 | 38/48 |
+| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 50/50 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 50/50 |
+| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 50/50 |
+| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 50/50 |
+| Fedora 43 | 2.41 | 5/7 | 1/8 | 6/6 | 40/50 |
 
 Fedora 43 rootless failures are caused by `newuidmap` lacking the setuid bit inside LXD containers (see [Known Failures](#fedora-rootless-failures-in-lxd)). Rootful (tier 3) passes all 6 tests.
 

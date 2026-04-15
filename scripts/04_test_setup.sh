@@ -79,8 +79,8 @@ echo "BATS: $(bats --version)"
 
 # Podman source (for BATS test files)
 if [ ! -d "${PODMAN_SRC}" ]; then
-    echo "Cloning Podman v5.8.1 source..."
-    git clone --depth 1 --branch v5.8.1 https://github.com/containers/podman.git "${PODMAN_SRC}"
+    echo "Cloning Podman v5.8.2 source..."
+    git clone --depth 1 --branch v5.8.2 https://github.com/containers/podman.git "${PODMAN_SRC}"
 fi
 
 # Dependencies needed by BATS helpers (skopeo for image prefetch, jq, socat, openssl).

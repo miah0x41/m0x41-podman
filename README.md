@@ -10,7 +10,7 @@
 [![Downloads](https://img.shields.io/github/downloads/miah0x41/m0x41-podman/total?logo=github&label=downloads)](https://github.com/miah0x41/m0x41-podman/releases)
 [![Stars](https://img.shields.io/github/stars/miah0x41/m0x41-podman?logo=github)](https://github.com/miah0x41/m0x41-podman/stargazers)
 
-[![Podman](https://img.shields.io/badge/Podman-v5.8.1-892CA0?logo=podman&logoColor=white)](https://github.com/containers/podman)
+[![Podman](https://img.shields.io/badge/Podman-v5.8.2-892CA0?logo=podman&logoColor=white)](https://github.com/containers/podman)
 [![snap base](https://img.shields.io/badge/snap%20base-core22-E95420?logo=ubuntu&logoColor=white)](https://snapcraft.io/docs/base-snaps)
 [![Platform](https://img.shields.io/badge/platform-linux--amd64-informational)](#distro-compatibility)
 [![Signed](https://img.shields.io/badge/signed-cosign-blue?logo=sigstore&logoColor=white)](#verification)
@@ -22,7 +22,7 @@
 
 ---
 
-_Podman_ v5.8.1 with full _Quadlet_ (systemd integration) support, packaged as a classic confinement snap on `core22` (Ubuntu 22.04). Bundles all runtime dependencies — no additional packages needed on the host beyond `uidmap` for rootless mode. Tested end-to-end across five Linux distributions in both _rootless_ and _rootful_ modes.
+_Podman_ v5.8.2 with full _Quadlet_ (systemd integration) support, packaged as a classic confinement snap on `core22` (Ubuntu 22.04). Bundles all runtime dependencies — no additional packages needed on the host beyond `uidmap` for rootless mode. Tested end-to-end across five Linux distributions in both _rootless_ and _rootful_ modes.
 
 ## Installation
 
@@ -31,7 +31,7 @@ Download the latest release from [GitHub Releases](https://github.com/miah0x41/m
 ```bash
 # Download the latest release
 curl -fsSL -o m0x41-podman.snap \
-  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap"
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.2+snap1_amd64.snap"
 
 # Install
 sudo snap install m0x41-podman.snap --dangerous --classic
@@ -56,9 +56,9 @@ Each release includes a SHA256 checksum, a [cosign](https://docs.sigstore.dev/co
 ```bash
 # Download the checksum and signature bundle
 curl -fsSL -o m0x41-podman.snap.sha256 \
-  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap.sha256"
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.2+snap1_amd64.snap.sha256"
 curl -fsSL -o m0x41-podman.snap.cosign-bundle \
-  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.1+snap2_amd64.snap.cosign-bundle"
+  "https://github.com/miah0x41/m0x41-podman/releases/latest/download/m0x41-podman_5.8.2+snap1_amd64.snap.cosign-bundle"
 
 # Integrity — verify the file was not corrupted or modified
 sha256sum -c m0x41-podman.snap.sha256
@@ -183,7 +183,7 @@ The snap bundles _Podman_ and all its runtime dependencies so that no additional
 
 | Component | Version | Source |
 |-----------|---------|--------|
-| `Podman` (with `quadlet`) | v5.8.1 | Built from source |
+| `Podman` (with `quadlet`) | v5.8.2 | Built from source |
 | `crun` | 1.19.1 | Built from source |
 | `conmon` | 2.0.26 | Built from source |
 | `netavark` | 1.14.1 | Pre-built binary |

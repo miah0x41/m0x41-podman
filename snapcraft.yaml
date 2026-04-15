@@ -1,6 +1,6 @@
 name: m0x41-podman
 title: Podman (miah0x41 package)
-version: "5.8.1"
+version: "5.8.2"
 contact: https://github.com/miah0x41
 source-code: https://github.com/miah0x41/m0x41-podman
 license: Apache-2.0
@@ -11,7 +11,7 @@ description: |
   drop-in replacement for Docker that does not require a background
   daemon or root privileges.
 
-  This is an unofficial snap built directly from upstream Podman v5.8.1
+  This is an unofficial snap built directly from upstream Podman v5.8.2
   sources. It bundles all runtime dependencies (`crun`, `conmon`, `netavark`,
   `aardvark-dns`, `fuse-overlayfs`, `slirp4netns`, `catatonit`). Rootless
   mode requires `uidmap` and `dbus-user-session` on the host (installed by
@@ -133,7 +133,7 @@ parts:
   podman:
     plugin: nil
     source: https://github.com/containers/podman.git
-    source-tag: "v5.8.1"
+    source-tag: "v5.8.2"
     source-depth: 1
     after: [go]
     build-packages:
