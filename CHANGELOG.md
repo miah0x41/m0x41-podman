@@ -4,6 +4,26 @@ All notable changes to the `m0x41-podman` snap package are documented here.
 
 Version format: `{upstream_podman_version}+snap{N}` — the suffix tracks snap packaging revisions independent of the upstream _Podman_ release.
 
+## v5.8.5+snap1
+
+Upstream bump to _Podman_ v5.8.5 (rolling up v5.8.3, v5.8.4, and v5.8.5). No packaging changes.
+
+**Upstream:** [Podman v5.8.3](https://github.com/containers/podman/releases/tag/v5.8.3), [v5.8.4](https://github.com/containers/podman/releases/tag/v5.8.4), [v5.8.5](https://github.com/containers/podman/releases/tag/v5.8.5) release notes
+
+These are security and bug-fix releases. Two of the security fixes are directly relevant to this snap, which ships the full `podman build` and image-run paths:
+
+- **CVE-2026-44517** (v5.8.3): a `Containerfile` using `ADD` or `COPY` against a malicious Git repository or tar archive could write files outside the build context. Fixed by updating the vendored Buildah to v1.43.2 ([GHSA-49p4-px3h-rq49](https://github.com/podman-container-tools/buildah/security/advisories/GHSA-49p4-px3h-rq49)).
+- **CVE-2026-57231** (v5.8.4): a malicious image with malformed `Env` entries could leak host environment variables into containers, including via the `*` glob operator ([GHSA-4hq8-gpf5-8p68](https://github.com/podman-container-tools/podman/security/advisories/GHSA-4hq8-gpf5-8p68)).
+
+The remaining upstream changes have no effect on this snap: the `golang.org/x/crypto` bump to v5.8.4 (CVE-2026-39830, CVE-2026-42508) is a vendored-dependency refresh, and the v5.8.5 fix for `podman machine` VMs shutting down on Mac/libkrun targets a component this Linux-only snap does not ship. The v5.8.4 remote-client `podman save -f oci-dir`/`docker-dir` fix carries over with the full binary but changes nothing in packaging.
+
+### Changes
+
+- `snapcraft.yaml` `version` and `source-tag` updated to `5.8.5` / `v5.8.5`
+- Both patches (`patches/generate-systemd-binary-path.patch`, `patches/healthcheck-ld-library-path.patch`) apply cleanly against v5.8.5 with no changes; v5.8.3–v5.8.5 touch none of the patched files
+- All current-version references across `README.md`, `docs/`, and test scripts bumped from v5.8.2 to v5.8.5. The tier 5 fix-attribution comments (#28213, #28409) retain their `v5.8.2` references, since those fixes first landed in that release
+- Post-incident investigation documents (`docs/investigations/`) retain their original references, since they describe historical analysis performed against earlier source trees
+
 ## v5.8.2+snap1
 
 Upstream bump to _Podman_ v5.8.2. No packaging changes.

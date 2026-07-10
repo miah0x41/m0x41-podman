@@ -36,8 +36,8 @@ tier1() {
     echo "===== TIER 1: Snap Command Validation ====="
 
     echo "--- snap command reports version ---"
-    if ${PODMAN} --version 2>&1 | grep -q "5.8.2"; then
-        pass "snap command reports 5.8.2"
+    if ${PODMAN} --version 2>&1 | grep -q "5.8.5"; then
+        pass "snap command reports 5.8.5"
     else
         fail "snap command version check"
     fi
@@ -268,8 +268,8 @@ tier5() {
     fi
 
     echo "--- shim reports correct version ---"
-    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.2"; then
-        pass "shim reports 5.8.2"
+    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.5"; then
+        pass "shim reports 5.8.5"
     else
         fail "shim version check"
     fi
@@ -422,8 +422,8 @@ CEOF
     fi
 
     echo "--- quadlet version matches ---"
-    if "${QUADLET}" --version 2>&1 | grep -q "5.8.2"; then
-        pass "quadlet version is 5.8.2"
+    if "${QUADLET}" --version 2>&1 | grep -q "5.8.5"; then
+        pass "quadlet version is 5.8.5"
     else
         fail "quadlet version mismatch"
     fi
@@ -902,14 +902,14 @@ tier6() {
         fi
 
         echo "--- podman functional after reboot ---"
-        if ${PODMAN} --version 2>&1 | grep -q "5.8.2"; then
+        if ${PODMAN} --version 2>&1 | grep -q "5.8.5"; then
             pass "podman version correct after reboot"
         else
             fail "podman version check failed after reboot"
         fi
 
         echo "--- shim survives reboot ---"
-        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.2"; then
+        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.5"; then
             pass "shim functional after reboot"
         else
             fail "shim broken after reboot"
@@ -952,7 +952,7 @@ tier6() {
         fi
 
         echo "--- quadlet still works after reboot ---"
-        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.2"; then
+        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.5"; then
             pass "quadlet functional after reboot"
         else
             fail "quadlet broken after reboot"
