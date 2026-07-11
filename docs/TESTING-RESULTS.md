@@ -2,6 +2,8 @@
 
 Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
+Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`). Tiers 1–6 run in an LXD container and VM; the full BATS suite (Tier 7) run in the VM in both modes.
+
 ## `core22` Snap — Single Distro (Ubuntu 24.04)
 
 | Tier | LXC Container | LXD VM | Description |
@@ -92,7 +94,7 @@ Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fa
 
 ## Full Upstream BATS Suite
 
-In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (78 files, 785 tests). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
+In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (786 tests on v5.8.5). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
 
 ### Running the Full Suite
 
@@ -118,43 +120,43 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 | Category | Tests | Pass | Skip | Fail |
 |----------|-------|------|------|------|
 | System & Info | 116 | 89 | 12 | 15 |
-| Container Lifecycle | 149 | 137 | 11 | 1 |
+| Container Lifecycle | 150 | 137 | 11 | 2 |
 | Images | 104 | 102 | 2 | 0 |
 | Volumes & Storage | 59 | 55 | 3 | 1 |
 | Networking | 111 | 21 | 89 | 1 |
 | Pods & Kube | 59 | 55 | 3 | 1 |
-| Systemd & Quadlet | 113 | 96 | 15 | 2 |
+| Systemd & Quadlet | 113 | 97 | 14 | 2 |
 | Security & Namespaces | 47 | 21 | 26 | 0 |
 | Advanced | 27 | 8 | 19 | 0 |
-| **Total** | **785** | **584** | **180** | **21** |
+| **Total** | **786** | **585** | **179** | **22** |
 
-Of the 785 tests, 180 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **605 applicable tests**: **584 pass (96.5%)**. The 21 residual failures are structural (missing `pasta`, `podman-testing` infra, timing). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
+Of the 786 tests, 179 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **607 applicable tests**: **585 pass (96.4%)** on Pass 1. The 22 residual failures are structural (`podman-testing` infra (11), timing, `slirp4netns` vs `pasta`). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
 
-The adapted shim (config env vars set conditionally, respecting pre-existing values) recovered **+25 tests** over the previous unconditional config override: System & Info (+6), Container Lifecycle (+1), Images (+3), Systemd & Quadlet (+15).
+The adapted shim (config env vars set conditionally, respecting pre-existing values) re-runs the config-sensitive files in Pass 2, recovering to **638/786 combined**.
 
 ### Results — Rootless Mode (Ubuntu 24.04, VM)
 
 | Category | Tests | Pass | Skip | Fail |
 |----------|-------|------|------|------|
 | System & Info | 116 | 89 | 10 | 17 |
-| Container Lifecycle | 149 | 142 | 6 | 1 |
+| Container Lifecycle | 150 | 143 | 6 | 1 |
 | Images | 104 | 101 | 3 | 0 |
 | Volumes & Storage | 59 | 52 | 7 | 0 |
-| Networking | 111 | 19 | 1 | 91 |
+| Networking | 111 | 20 | 2 | 89 |
 | Pods & Kube | 59 | 56 | 2 | 1 |
-| Systemd & Quadlet | 113 | 95 | 13 | 5 |
+| Systemd & Quadlet | 113 | 96 | 13 | 4 |
 | Security & Namespaces | 47 | 18 | 29 | 0 |
 | Advanced | 27 | 12 | 15 | 0 |
-| **Total** | **785** | **584** | **86** | **115** |
+| **Total** | **786** | **587** | **87** | **112** |
 
-**584/785 pass, 86 skipped, 115 failures.** However, 91 of those failures are `pasta` networking tests (`505-networking-pasta.bats` + `500-networking.bats`) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. Excluding `pasta`: **584/608 applicable tests (96.1%)** with 24 real failures.
+**587/786 pass, 87 skipped, 112 failures.** However, 89 of those failures are `pasta` networking tests (`505-networking-pasta.bats` (84) + `500-networking.bats` (5)) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. Excluding `pasta`: **587/610 applicable tests (96.2%)** with 23 real failures.
 
-The adapted shim recovered **+73 tests** over the previous unconditional config override (up from 511). Rootless passes the same number of tests as root mode (584) because root-only skips (e.g. `060-mount.bats`, `550-pause-process.bats`) become rootless-passing tests, offsetting the additional `pasta` failures.
+Pass 2 (adapted shim, re-running config-sensitive files) recovers to **711/786 combined**. Rootless passes slightly more tests than root mode because root-only skips (e.g. `060-mount.bats`) become rootless-running tests, partly offsetting the additional `pasta` failures.
 
 ### Notes
 
-- **`pasta` networking tests (91 rootless, 89 root skips)** are not applicable. The snap bundles `slirp4netns` because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode the test harness detects `pasta` as absent and skips them; in rootless mode it attempts to run them and they fail. These should be excluded when comparing against native _Podman_ pass rates.
-- **Adapted shim** — the shim and wrapper now set `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` conditionally (`${VAR:-default}`), respecting pre-existing values. This recovered 25 root and 73 rootless tests that previously failed due to config overrides.
+- **`pasta` networking tests (89 rootless, 89 root skips)** are not applicable. The snap bundles `slirp4netns` because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode the test harness detects `pasta` as absent and skips them; in rootless mode it attempts to run them and they fail. These should be excluded when comparing against native _Podman_ pass rates.
+- **Adapted shim** — the shim and wrapper set `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` conditionally (`${VAR:-default}`), respecting pre-existing values. The Pass 2 re-run of config-sensitive files recovers the combined totals to 638/786 (root) and 711/786 (rootless).
 - **Remaining snap-specific failures** are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path, and `podman-testing` runs outside the snap environment. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
 - **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
 - **`conmon` upgraded to v2.0.26**: Fixes stderr data loss with large stdout volumes (`030-run.bats` test 34). See [conmon#236](https://github.com/containers/conmon/issues/236). Built from source (pre-built binaries lack journald support).
@@ -176,7 +178,7 @@ These tests can only run in a VM because they validate system-level side effects
 
 ## Test Environment
 
-**Bare-metal** (2026-04-01):
+**Bare-metal** (host environment established 2026-04-01; v5.8.5 re-validation 2026-07-11):
 
 - **Host**: Intel i7-8700, 125 GB RAM, Linux 6.8.0-100-generic (Ubuntu)
 - **LXD**: 5.21.4 LTS (snap)

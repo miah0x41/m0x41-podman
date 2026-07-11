@@ -23,6 +23,7 @@ The remaining upstream changes have no effect on this snap: the `golang.org/x/cr
 - Both patches (`patches/generate-systemd-binary-path.patch`, `patches/healthcheck-ld-library-path.patch`) apply cleanly against v5.8.5 with no changes; v5.8.3–v5.8.5 touch none of the patched files
 - All current-version references across `README.md`, `docs/`, and test scripts bumped from v5.8.2 to v5.8.5. The tier 5 fix-attribution comments (#28213, #28409) retain their `v5.8.2` references, since those fixes first landed in that release
 - Post-incident investigation documents (`docs/investigations/`) retain their original references, since they describe historical analysis performed against earlier source trees
+- `docs/TESTING-RESULTS.md` and `docs/TEST-FAILURES.md` refreshed with the v5.8.5 re-validation (full 7-tier matrix; Tier 7 BATS root 585→638/786 and rootless 587→711/786 combined)
 
 ## v5.8.2+snap1
 

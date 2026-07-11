@@ -2,7 +2,7 @@
 
 This document records every known test failure in the `m0x41-podman` snap test suite, grouped by tier. Each failure indicates whether it occurs in LXC containers, LXD VMs, or both, along with the root cause classification.
 
-Tested 2026-04-06 on bare-metal KVM (VM). Ubuntu 24.04.
+Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`) on Ubuntu 24.04 (LXD VM). Tiers 1–6 were run in both an LXD container and an LXD VM; Tier 7 (full BATS) was run in the VM in both root and rootless modes. The LXC-vs-VM recovery analysis in the Tier 7 section is carried from the original 2026-04-06 baseline, since Tier 7 was not re-run under LXC for this bump; the VM figures below reflect the v5.8.5 run.
 
 ## Summary
 
@@ -16,8 +16,8 @@ Tested 2026-04-06 on bare-metal KVM (VM). Ubuntu 24.04.
 | 5e | 5 | 2 | VM recovers 3 (environment + `htpasswd`) |
 | 5g | — | 0 | VM only; no LXC data |
 | 6 | — | 0 | VM only |
-| 7 (root) | 126 | 46 of 605 applicable | 180 skipped (pasta, SELinux, etc.); VM recovers 80; 5 more via adapted shim |
-| 7 (rootless) | — | 100 of 611 applicable | 83 skipped + 91 `pasta` not applicable |
+| 7 (root) | — | 22 of 607 applicable | 179 skipped (pasta, SELinux, etc.); adapted shim recovers to 638/786 combined |
+| 7 (rootless) | — | 23 of 610 applicable | 87 skipped + 89 `pasta` not applicable; adapted shim recovers to 711/786 combined |
 
 ---
 
@@ -101,38 +101,26 @@ No failures across network integrity (5), library path integrity (3), systemd he
 
 ## Tier 7: Full Upstream BATS Suite
 
-### Root Mode — LXC vs VM
+### Root Mode (VM)
 
-Of the 785 upstream tests, 180 are skipped by the test harness — tests for `pasta` networking, SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **605 applicable tests**:
+Of the 786 upstream tests, 179 are skipped by the test harness — tests for `pasta` networking, SELinux, checkpoint/restore, and SSH/remote, none of which the snap ships. Of the **607 applicable tests**:
 
-**LXC:** 480 pass (79%) | **VM:** 559 pass (92%) | **VM adapted:** 564 pass (93%)
+**Pass 1 (upstream shim):** 585 pass (96.4%), 22 failures. **Pass 2 (adapted shim):** recovers config-sensitive files to **638/786 combined**.
 
-The VM recovers 79 tests over LXC. The adapted shim pass (respecting pre-existing config env vars) recovers 5 more. The 46 residual VM failures are classified below.
+The 22 residual Pass 1 failures are classified below.
 
-#### LXC-Only Failures (80 tests, resolved in VM)
+#### Root Failures by File (22, VM)
 
-| Category | Tests Recovered | Cause |
-|----------|----------------|-------|
-| Quadlet path missing | 44 | Install hook now creates `/usr/libexec/podman/quadlet` symlink |
-| Missing `buildah` | 5 | Added to `04_test_setup.sh` |
-| LXD kernel limitations | 3 | Full VM kernel eliminates namespace and device restrictions |
-| Images / security | 26 | Full VM kernel provides reliable overlay, device access |
-| `podman-testing` partial fix | 0 | Binary builds but 11 tests remain infra-limited |
-| Networking | 1 | VM network stack more reliable |
-| Conmon stderr fix | 1 | `conmon` v2.0.26 fixes `dd` stderr data loss |
-
-#### Failures in Both Environments (46 VM failures)
-
-| Category | Count | Root Cause | Detail |
-|----------|-------|------------|--------|
-| Snap config override | 27 | Shim force-sets `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` | 5 recoverable via adapted shim; 22 structural |
-| `podman-testing` infra | 11 | Binary runs outside snap environment, cannot find snap's `conmon` | `331-system-check.bats` |
-| Health check timing | 2 | Wrapper overhead shifts timing assertions | `220-healthcheck.bats` |
-| Shell completion | 2 | Completion engine uses snap storage path instead of test's temporary storage | `600-completion.bats` |
-| Registry state leakage | 1 | Auth directory conflicts between parallel BATS file runs | `150-login.bats` |
-| Container restart timing | 1 | `slirp4netns` restart latency vs `pasta` | `500-networking.bats` |
-| Kube health check timing | 1 | `initialDelaySeconds` assertion too tight with wrapper overhead | `700-play.bats` |
-| Image store path | 1 | Test reads `/etc/containers/storage.conf` directly; snap redirects this | `010-images.bats` |
+| File | Fail | Classification | Root Cause |
+|------|------|----------------|------------|
+| `331-system-check.bats` | 11 | Infra | `podman-testing` helper runs outside the snap and cannot find the bundled `conmon` |
+| `005-info.bats` | 2 | Snap config | `CONTAINERS_CONF` / `CONTAINERS_STORAGE_CONF` precedence (recovered by adapted shim) |
+| `252-quadlet.bats` | 2 | Snap | `basic` (container-output timeout) and `envvar` (env passthrough under shim) |
+| `220-healthcheck.bats` | 2 | Environment | journal/events log query + PATH-manipulation test artifact |
+| `030-run.bats` | 2 | Environment | `check workdir` and `oom-score-adj` assertions under snap env |
+| `060-mount.bats` | 1 | Environment | mount assertion under VM |
+| `200-pod.bats` | 1 | Environment | pod timing |
+| `500-networking.bats` | 1 | Snap | `slirp4netns` restart latency vs `pasta` |
 
 #### Adapted Shim Recoveries (5 tests)
 
@@ -146,35 +134,28 @@ These tests pass when the shim respects pre-existing config environment variable
 | `containers.conf read-only` | `800-config.bats` |
 | `containers.conf tmpdir` | `800-config.bats` |
 
-#### Structural Failures (22 tests, adapted pass)
+The `generate systemd` / `runlabel` binary-path failures noted in earlier baselines no longer occur: `250-systemd.bats`, `255-auto-update.bats`, and `037-runlabel.bats` pass in root mode on v5.8.5. The `generate-systemd-binary-path.patch` (`PODMAN_BINARY` override) makes generated units reference the shim at `/usr/local/bin/podman` rather than the snap-internal path — confirmed in the Tier 5 dry-run assertions and directly in the `250-systemd` output. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md) for the original analysis.
 
-18 of 22 share the same root cause: `podman generate systemd` (deprecated) resolves its own binary path at runtime and embeds `/snap/m0x41-podman/x1/usr/bin/podman` in generated unit files. When systemd invokes this path directly, it lacks `LD_LIBRARY_PATH` and config env vars. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
+### Rootless Mode (VM)
 
-| Category | Count | Files |
-|----------|-------|-------|
-| Generated units embed snap binary path | 15 | `250-systemd.bats` (5), `255-auto-update.bats` (10) |
-| Quadlet with adapted shim (test artefact) | 2 | `252-quadlet.bats` |
-| `runlabel` embeds snap binary path | 1 | `037-runlabel.bats` |
-| `podman-testing` cannot find snap conmon | 1 | `005-info.bats` |
-| Registry state leakage | 1 | `255-auto-update.bats` |
-| Health check timing | 1 | `005-info.bats` |
-| `dd` stderr data loss | 0 | **Fixed** — `conmon` upgraded to v2.0.26 |
+**VM:** 786 tests — 587 pass, 87 skipped, 112 raw failures. **Pass 2 (adapted shim):** recovers to **711/786 combined**.
 
-### Rootless Mode — VM Only
+The snap bundles `slirp4netns` instead of `pasta` for rootless networking. In root mode, the test harness detects `pasta` as absent and skips these tests; in rootless mode, the same tests attempt to run and fail. The 89 `pasta` failures are not applicable to the snap and should be excluded from the pass rate.
 
-**VM:** 511 pass, 83 skipped, 191 raw failures — but 91 are `pasta` networking tests (not applicable)
+**Excluding `pasta`: 587/610 applicable tests (96.2%)**, 23 real failures.
 
-The snap bundles `slirp4netns` instead of `pasta` for rootless networking. In root mode, the test harness detects `pasta` as absent and skips these tests. In rootless mode, the same tests attempt to run and fail. These 91 tests are not applicable to the snap and should be excluded from the pass rate.
-
-**Excluding `pasta`: 511/611 applicable tests (84%)**, 100 real failures.
-
-| Category | Count | Root Cause |
-|----------|-------|------------|
-| `pasta` networking (not applicable) | 91 | `505-networking-pasta.bats` (85) + `500-networking.bats` (6) — skip in root mode, fail in rootless |
-| Snap config override | 32 | Same as root mode, plus 5 additional rootless-specific |
-| Systemd / Quadlet | 46 | Generated units + deprecated `podman generate systemd` path |
-| `podman-testing` infra | 11 | Same as root mode |
-| Other | 11 | Health check timing, image store path, registry |
+| File | Fail | Classification | Root Cause |
+|------|------|----------------|------------|
+| `505-networking-pasta.bats` | 84 | Not applicable | `pasta` networking — snap ships `slirp4netns` |
+| `331-system-check.bats` | 11 | Infra | `podman-testing` cannot find snap's `conmon` (same as root) |
+| `500-networking.bats` | 5 | Not applicable | `pasta`-dependent networking under rootless |
+| `005-info.bats` | 2 | Snap config | `CONTAINERS_CONF` precedence (recovered by adapted shim) |
+| `220-healthcheck.bats` | 2 | Environment | journal/events log query + PATH-manipulation artifact |
+| `250-systemd.bats` | 2 | Environment | `service_cleanup` timing + rootless-netns cgroup assertion |
+| `252-quadlet.bats` | 2 | Snap | `basic` + `envvar` (same as root) |
+| `800-config.bats` | 2 | Snap config | config precedence (recovered by adapted shim) |
+| `030-run.bats` | 1 | Environment | run assertion under snap env |
+| `200-pod.bats` | 1 | Environment | pod timing |
 
 ---
 
