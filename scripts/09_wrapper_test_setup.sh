@@ -98,8 +98,20 @@ export PATH="/snap/bin:$PATH"
 
 # ---------- Phase 4: Install snap ----------
 echo "=== Phase 4: Install snap (classic) ==="
-snap wait system seed.loaded 2>/dev/null || true
-snap install "${SNAP_FILE}" --dangerous --classic
+# `snap wait` can return before snapd will accept an install — on images that
+# ship snapd preinstalled (Ubuntu) the seed change is still settling, and the
+# install fails with "device not yet seeded". Retry until snapd is ready.
+for attempt in $(seq 1 30); do
+    snap wait system seed.loaded 2>/dev/null || true
+    if snap install "${SNAP_FILE}" --dangerous --classic 2>&1; then
+        break
+    fi
+    if [ "${attempt}" -eq 30 ]; then
+        echo "ERROR: snap install failed after ${attempt} attempts"
+        exit 1
+    fi
+    sleep 5
+done
 
 if ! m0x41-podman --version 2>&1; then
     echo "ERROR: snap binary fails to execute"

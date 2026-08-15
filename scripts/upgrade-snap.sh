@@ -15,7 +15,7 @@ fi
 SNAP_FILE="${1:-}"
 if [ -z "${SNAP_FILE}" ] || [ ! -f "${SNAP_FILE}" ]; then
     echo "Usage: $0 <path-to-snap-file>"
-    echo "  e.g. $0 m0x41-podman_5.8.5+snap1_amd64.snap"
+    echo "  e.g. $0 m0x41-podman_5.8.6+snap1_amd64.snap"
     exit 1
 fi
 
@@ -138,6 +138,10 @@ echo "=== Step 5: Health checks ==="
 
 FAILURES=0
 
+# See 05_run_tests.sh: `grep -q` exits on first match and SIGPIPEs the producer,
+# which `set -o pipefail` reports as a failed pipeline. `grep -c` reads to EOF.
+qgrep() { grep -c -e "$1" >/dev/null; }
+
 # 5a: Snap binary works.
 echo "--- snap binary ---"
 if ${PODMAN} --version >/dev/null 2>&1; then
@@ -159,7 +163,7 @@ fi
 # 5c: Quadlet symlink.
 echo "--- quadlet ---"
 if [ -L /usr/libexec/podman/quadlet ] && \
-   readlink /usr/libexec/podman/quadlet 2>/dev/null | grep -q m0x41-podman; then
+   readlink /usr/libexec/podman/quadlet 2>/dev/null | qgrep m0x41-podman; then
     echo "  PASS: quadlet symlink exists"
 else
     echo "  FAIL: quadlet symlink missing"
@@ -170,7 +174,7 @@ fi
 echo "--- generators ---"
 for gen in /usr/lib/systemd/system-generators/podman-system-generator \
            /usr/lib/systemd/user-generators/podman-user-generator; do
-    if [ -L "${gen}" ] && readlink "${gen}" 2>/dev/null | grep -q m0x41-podman; then
+    if [ -L "${gen}" ] && readlink "${gen}" 2>/dev/null | qgrep m0x41-podman; then
         echo "  PASS: $(basename ${gen})"
     else
         echo "  FAIL: $(basename ${gen}) missing"

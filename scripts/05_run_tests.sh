@@ -19,6 +19,16 @@ pass() { echo "  PASS: $1"; }
 fail() { echo "  FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 FAILURES=0
 
+# `grep -q` exits as soon as it matches, which SIGPIPEs a producer that is still
+# writing. Under `set -o pipefail` the pipeline then reports that producer's 141
+# instead of grep's 0, turning a successful match into a spurious test failure.
+# The race only bites when the producer is slow enough to still be writing (e.g.
+# `su -` into `systemctl --user`), which made it look like flaky infrastructure.
+# `grep -c` reads stdin to EOF, so the producer never sees SIGPIPE; the exit
+# status is still 0 on match and 1 on no match.
+qgrep()  { grep -c  -e "$1" >/dev/null; }
+qgrepE() { grep -cE -e "$1" >/dev/null; }
+
 run_as_testuser() {
     local uid
     uid=$(id -u "${TESTUSER}")
@@ -36,15 +46,15 @@ tier1() {
     echo "===== TIER 1: Snap Command Validation ====="
 
     echo "--- snap command reports version ---"
-    if ${PODMAN} --version 2>&1 | grep -q "5.8.5"; then
-        pass "snap command reports 5.8.5"
+    if ${PODMAN} --version 2>&1 | qgrep "5.8.6"; then
+        pass "snap command reports 5.8.6"
     else
         fail "snap command version check"
     fi
 
     echo "--- podman info as root ---"
     RUNTIME=$(${PODMAN} info --format '{{.Host.OCIRuntime.Name}}' 2>&1) || true
-    if echo "${RUNTIME}" | grep -q "crun"; then
+    if echo "${RUNTIME}" | qgrep "crun"; then
         pass "root: OCI runtime is crun"
     else
         fail "root: OCI runtime is '${RUNTIME}', expected 'crun'"
@@ -52,7 +62,7 @@ tier1() {
 
     echo "--- podman info as rootless ---"
     RUNTIME_RL=$(run_as_testuser "${PODMAN} info --format '{{.Host.OCIRuntime.Name}}'" 2>&1) || true
-    if echo "${RUNTIME_RL}" | grep -q "crun"; then
+    if echo "${RUNTIME_RL}" | qgrep "crun"; then
         pass "rootless: OCI runtime is crun"
     else
         fail "rootless: OCI runtime is '${RUNTIME_RL}', expected 'crun'"
@@ -60,7 +70,7 @@ tier1() {
 
     echo "--- crun version ---"
     CRUN_VER=$(${PODMAN} info --format '{{.Host.OCIRuntime.Version}}' 2>&1) || true
-    if echo "${CRUN_VER}" | grep -q "1.19.1"; then
+    if echo "${CRUN_VER}" | qgrep "1.19.1"; then
         pass "crun version is 1.19.1"
     else
         fail "crun version is '${CRUN_VER}', expected 1.19.1"
@@ -68,7 +78,7 @@ tier1() {
 
     echo "--- network backend ---"
     NET=$(${PODMAN} info --format '{{.Host.NetworkBackend}}' 2>&1) || true
-    if echo "${NET}" | grep -q "netavark"; then
+    if echo "${NET}" | qgrep "netavark"; then
         pass "network backend is netavark"
     else
         fail "network backend is '${NET}', expected 'netavark'"
@@ -76,7 +86,7 @@ tier1() {
 
     echo "--- storage driver ---"
     DRIVER=$(run_as_testuser "${PODMAN} info --format '{{.Store.GraphDriverName}}'" 2>&1) || true
-    if echo "${DRIVER}" | grep -q "overlay"; then
+    if echo "${DRIVER}" | qgrep "overlay"; then
         pass "storage driver is overlay"
     else
         fail "storage driver is '${DRIVER}', expected 'overlay'"
@@ -84,7 +94,7 @@ tier1() {
 
     echo "--- conmon resolves inside snap ---"
     CONMON=$(${PODMAN} info --format '{{.Host.Conmon.Path}}' 2>&1) || true
-    if echo "${CONMON}" | grep -q "/snap/m0x41-podman/"; then
+    if echo "${CONMON}" | qgrep "/snap/m0x41-podman/"; then
         pass "conmon resolves inside snap (${CONMON})"
     else
         fail "conmon path '${CONMON}' not inside snap"
@@ -145,7 +155,7 @@ CEOF
     fi
 
     echo "--- container DNS resolution (rootless) ---"
-    if run_as_testuser "${PODMAN} run --rm docker.io/library/alpine:latest nslookup dns.google" 2>&1 | grep -q "Address.*8.8"; then
+    if run_as_testuser "${PODMAN} run --rm docker.io/library/alpine:latest nslookup dns.google" 2>&1 | qgrep "Address.*8.8"; then
         pass "rootless DNS resolution"
     else
         fail "rootless DNS resolution"
@@ -268,15 +278,15 @@ tier5() {
     fi
 
     echo "--- shim reports correct version ---"
-    if /usr/local/bin/podman --version 2>&1 | grep -q "5.8.5"; then
-        pass "shim reports 5.8.5"
+    if /usr/local/bin/podman --version 2>&1 | qgrep "5.8.6"; then
+        pass "shim reports 5.8.6"
     else
         fail "shim version check"
     fi
 
     echo "--- shim finds OCI runtime ---"
     SHIM_RUNTIME=$(/usr/local/bin/podman info --format '{{.Host.OCIRuntime.Name}}' 2>&1) || true
-    if echo "${SHIM_RUNTIME}" | grep -q "crun"; then
+    if echo "${SHIM_RUNTIME}" | qgrep "crun"; then
         pass "shim: OCI runtime is crun"
     else
         fail "shim: OCI runtime is '${SHIM_RUNTIME}', expected 'crun'"
@@ -319,14 +329,14 @@ tier5() {
 
     echo "--- quadlet symlink at standard path ---"
     if [ -L /usr/libexec/podman/quadlet ] && \
-       readlink /usr/libexec/podman/quadlet 2>/dev/null | grep -q m0x41-podman; then
+       readlink /usr/libexec/podman/quadlet 2>/dev/null | qgrep m0x41-podman; then
         pass "quadlet symlink exists at /usr/libexec/podman/quadlet"
     else
         fail "quadlet symlink missing at /usr/libexec/podman/quadlet"
     fi
 
     echo "--- no snap library paths in ldconfig cache ---"
-    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+    if ldconfig -p 2>/dev/null | qgrep "/snap/m0x41-podman/"; then
         fail "snap libraries found in ldconfig cache (library path poisoning)"
     else
         pass "no snap libraries in ldconfig cache"
@@ -377,7 +387,7 @@ tier5() {
 
     echo "--- man page symlinks installed ---"
     if [ -L /usr/local/share/man/man1/podman.1 ] && \
-       readlink /usr/local/share/man/man1/podman.1 2>/dev/null | grep -q m0x41-podman; then
+       readlink /usr/local/share/man/man1/podman.1 2>/dev/null | qgrep m0x41-podman; then
         pass "man page symlinks installed"
     else
         fail "man page symlinks missing"
@@ -385,7 +395,7 @@ tier5() {
 
     echo "--- man -w podman finds snap man page ---"
     if command -v man >/dev/null 2>&1; then
-        if man -w podman 2>/dev/null | grep -q podman; then
+        if man -w podman 2>/dev/null | qgrep podman; then
             pass "man -w podman finds man page"
         else
             fail "man -w podman cannot find man page"
@@ -408,22 +418,22 @@ CEOF
 
     echo "--- quadlet generates valid unit ---"
     DRYRUN_OUT=$(QUADLET_UNIT_DIRS="${QUADLET_TMPDIR}" "${QUADLET}" -dryrun 2>&1) || true
-    if echo "${DRYRUN_OUT}" | grep -q "\[Service\]"; then
+    if echo "${DRYRUN_OUT}" | qgrep "\[Service\]"; then
         pass "quadlet dry-run produces [Service] section"
     else
         fail "quadlet dry-run missing [Service] section"
     fi
 
     echo "--- generated ExecStart references shim path ---"
-    if echo "${DRYRUN_OUT}" | grep -q "ExecStart=/usr/local/bin/podman"; then
+    if echo "${DRYRUN_OUT}" | qgrep "ExecStart=/usr/local/bin/podman"; then
         pass "ExecStart references /usr/local/bin/podman"
     else
         fail "ExecStart does not reference /usr/local/bin/podman"
     fi
 
     echo "--- quadlet version matches ---"
-    if "${QUADLET}" --version 2>&1 | grep -q "5.8.5"; then
-        pass "quadlet version is 5.8.5"
+    if "${QUADLET}" --version 2>&1 | qgrep "5.8.6"; then
+        pass "quadlet version is 5.8.6"
     else
         fail "quadlet version mismatch"
     fi
@@ -491,7 +501,7 @@ CEOF
     fi
 
     echo "--- rootful quadlet output correct ---"
-    if journalctl -u snap-test-quadlet.service --no-pager -n 10 2>/dev/null | grep -q "quadlet-rootful-ok"; then
+    if journalctl -u snap-test-quadlet.service --no-pager -n 10 2>/dev/null | qgrep "quadlet-rootful-ok"; then
         pass "rootful quadlet output: quadlet-rootful-ok"
     else
         fail "rootful quadlet output missing"
@@ -532,9 +542,9 @@ CEOF
     # Try user journal first; fall back to system journal (CentOS/RHEL in LXD
     # does not populate user journals, but process output lands in the system
     # journal with _SYSTEMD_USER_UNIT metadata)
-    if run_as_testuser "journalctl --user -u snap-test-rootless.service --no-pager -n 10" 2>/dev/null | grep -q "quadlet-rootless-ok"; then
+    if run_as_testuser "journalctl --user -u snap-test-rootless.service --no-pager -n 10" 2>/dev/null | qgrep "quadlet-rootless-ok"; then
         pass "rootless quadlet output: quadlet-rootless-ok"
-    elif journalctl _SYSTEMD_USER_UNIT=snap-test-rootless.service --no-pager -n 10 2>/dev/null | grep -q "quadlet-rootless-ok"; then
+    elif journalctl _SYSTEMD_USER_UNIT=snap-test-rootless.service --no-pager -n 10 2>/dev/null | qgrep "quadlet-rootless-ok"; then
         pass "rootless quadlet output: quadlet-rootless-ok (system journal)"
     else
         fail "rootless quadlet output missing"
@@ -618,7 +628,7 @@ CEOF
     HC_CONTAINER_ID=$(${PODMAN} inspect --format '{{.Id}}' "${HC_NAME}" 2>/dev/null) || true
     HC_TIMER_FOUND=false
     for _i in $(seq 1 10); do
-        if [ -n "${HC_CONTAINER_ID}" ] && systemctl list-units --type=timer --no-pager 2>/dev/null | grep -q "${HC_CONTAINER_ID:0:12}"; then
+        if [ -n "${HC_CONTAINER_ID}" ] && systemctl list-units --type=timer --no-pager 2>/dev/null | qgrep "${HC_CONTAINER_ID:0:12}"; then
             HC_TIMER_FOUND=true
             break
         fi
@@ -634,7 +644,7 @@ CEOF
 
     echo "--- rootful healthcheck: ExecStart references shim ---"
     HC_EXEC=$(systemctl show "${HC_SVC}" --property=ExecStart 2>/dev/null) || true
-    if [ -n "${HC_EXEC}" ] && echo "${HC_EXEC}" | grep -q "/usr/local/bin/podman"; then
+    if [ -n "${HC_EXEC}" ] && echo "${HC_EXEC}" | qgrep "/usr/local/bin/podman"; then
         pass "rootful healthcheck ExecStart references shim"
     else
         fail "rootful healthcheck ExecStart references snap binary, not shim (${HC_EXEC})"
@@ -642,28 +652,28 @@ CEOF
 
     echo "--- rootful healthcheck: transient service has LD_LIBRARY_PATH ---"
     HC_ENV=$(systemctl show "${HC_SVC}" --property=Environment 2>/dev/null) || true
-    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "LD_LIBRARY_PATH"; then
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | qgrep "LD_LIBRARY_PATH"; then
         pass "rootful healthcheck transient service has LD_LIBRARY_PATH"
     else
         fail "rootful healthcheck transient service missing LD_LIBRARY_PATH"
     fi
 
     echo "--- rootful healthcheck: transient service has CONTAINERS_CONF ---"
-    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_CONF="; then
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | qgrep "CONTAINERS_CONF="; then
         pass "rootful healthcheck transient service has CONTAINERS_CONF"
     else
         fail "rootful healthcheck transient service missing CONTAINERS_CONF"
     fi
 
     echo "--- rootful healthcheck: transient service has CONTAINERS_REGISTRIES_CONF ---"
-    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_REGISTRIES_CONF="; then
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | qgrep "CONTAINERS_REGISTRIES_CONF="; then
         pass "rootful healthcheck transient service has CONTAINERS_REGISTRIES_CONF"
     else
         fail "rootful healthcheck transient service missing CONTAINERS_REGISTRIES_CONF"
     fi
 
     echo "--- rootful healthcheck: transient service has CONTAINERS_STORAGE_CONF ---"
-    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | grep -q "CONTAINERS_STORAGE_CONF="; then
+    if [ -n "${HC_ENV}" ] && echo "${HC_ENV}" | qgrep "CONTAINERS_STORAGE_CONF="; then
         pass "rootful healthcheck transient service has CONTAINERS_STORAGE_CONF"
     else
         fail "rootful healthcheck transient service missing CONTAINERS_STORAGE_CONF"
@@ -700,7 +710,7 @@ CEOF
     HC_RL_ID=$(run_as_testuser "${PODMAN} inspect --format '{{.Id}}' ${HC_NAME_RL}" 2>/dev/null) || true
     HC_RL_TIMER_FOUND=false
     for _i in $(seq 1 10); do
-        if [ -n "${HC_RL_ID}" ] && run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | grep -q "${HC_RL_ID:0:12}"; then
+        if [ -n "${HC_RL_ID}" ] && run_as_testuser "systemctl --user list-units --type=timer --no-pager" 2>/dev/null | qgrep "${HC_RL_ID:0:12}"; then
             HC_RL_TIMER_FOUND=true
             break
         fi
@@ -716,7 +726,7 @@ CEOF
 
     echo "--- rootless healthcheck: ExecStart references shim ---"
     HC_RL_EXEC=$(run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=ExecStart" 2>/dev/null) || true
-    if [ -n "${HC_RL_EXEC}" ] && echo "${HC_RL_EXEC}" | grep -q "/usr/local/bin/podman"; then
+    if [ -n "${HC_RL_EXEC}" ] && echo "${HC_RL_EXEC}" | qgrep "/usr/local/bin/podman"; then
         pass "rootless healthcheck ExecStart references shim"
     else
         fail "rootless healthcheck ExecStart references snap binary, not shim (${HC_RL_EXEC})"
@@ -724,28 +734,28 @@ CEOF
 
     echo "--- rootless healthcheck: transient service has LD_LIBRARY_PATH ---"
     HC_RL_ENV=$(run_as_testuser "systemctl --user show '${HC_RL_SVC}' --property=Environment" 2>/dev/null) || true
-    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "LD_LIBRARY_PATH"; then
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | qgrep "LD_LIBRARY_PATH"; then
         pass "rootless healthcheck transient service has LD_LIBRARY_PATH"
     else
         fail "rootless healthcheck transient service missing LD_LIBRARY_PATH"
     fi
 
     echo "--- rootless healthcheck: transient service has CONTAINERS_CONF ---"
-    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_CONF="; then
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | qgrep "CONTAINERS_CONF="; then
         pass "rootless healthcheck transient service has CONTAINERS_CONF"
     else
         fail "rootless healthcheck transient service missing CONTAINERS_CONF"
     fi
 
     echo "--- rootless healthcheck: transient service has CONTAINERS_REGISTRIES_CONF ---"
-    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_REGISTRIES_CONF="; then
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | qgrep "CONTAINERS_REGISTRIES_CONF="; then
         pass "rootless healthcheck transient service has CONTAINERS_REGISTRIES_CONF"
     else
         fail "rootless healthcheck transient service missing CONTAINERS_REGISTRIES_CONF"
     fi
 
     echo "--- rootless healthcheck: transient service has CONTAINERS_STORAGE_CONF ---"
-    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | grep -q "CONTAINERS_STORAGE_CONF="; then
+    if [ -n "${HC_RL_ENV}" ] && echo "${HC_RL_ENV}" | qgrep "CONTAINERS_STORAGE_CONF="; then
         pass "rootless healthcheck transient service has CONTAINERS_STORAGE_CONF"
     else
         fail "rootless healthcheck transient service missing CONTAINERS_STORAGE_CONF"
@@ -787,7 +797,7 @@ tier6() {
     fi
 
     echo "--- default route intact ---"
-    if ip route show default | grep -q "default"; then
+    if ip route show default | qgrep "default"; then
         pass "default route exists"
     else
         fail "default route missing"
@@ -824,21 +834,21 @@ tier6() {
     echo "--- 6b: Library path integrity ---"
 
     echo "--- ldconfig cache clean ---"
-    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+    if ldconfig -p 2>/dev/null | qgrep "/snap/m0x41-podman/"; then
         fail "snap libraries leaked into ldconfig cache"
     else
         pass "ldconfig cache has no snap library paths"
     fi
 
     echo "--- no ld.so.conf.d entries ---"
-    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | grep -q .; then
+    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | qgrep .; then
         fail "podman ld.so.conf.d file exists"
     else
         pass "no podman ld.so.conf.d entries"
     fi
 
     echo "--- host ldd resolves coreutils normally ---"
-    if ldd /usr/bin/ls 2>&1 | grep -q "/snap/m0x41-podman/"; then
+    if ldd /usr/bin/ls 2>&1 | qgrep "/snap/m0x41-podman/"; then
         fail "host binaries resolving libraries from snap path"
     else
         pass "host ldd does not reference snap libraries"
@@ -867,7 +877,7 @@ tier6() {
     fi
 
     echo "--- systemd overall health ---"
-    if systemctl is-system-running --wait 2>/dev/null | grep -qE "^(running|degraded)$"; then
+    if systemctl is-system-running --wait 2>/dev/null | qgrepE "^(running|degraded)$"; then
         SYSTEM_STATE=$(systemctl is-system-running 2>/dev/null)
         if [ "${SYSTEM_STATE}" = "running" ]; then
             pass "systemd reports system running"
@@ -902,28 +912,28 @@ tier6() {
         fi
 
         echo "--- podman functional after reboot ---"
-        if ${PODMAN} --version 2>&1 | grep -q "5.8.5"; then
+        if ${PODMAN} --version 2>&1 | qgrep "5.8.6"; then
             pass "podman version correct after reboot"
         else
             fail "podman version check failed after reboot"
         fi
 
         echo "--- shim survives reboot ---"
-        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | grep -q "5.8.5"; then
+        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | qgrep "5.8.6"; then
             pass "shim functional after reboot"
         else
             fail "shim broken after reboot"
         fi
 
         echo "--- rootful container runs after reboot ---"
-        if ${PODMAN} run --rm docker.io/library/alpine:latest echo "post-reboot-ok" 2>&1 | grep -q "post-reboot-ok"; then
+        if ${PODMAN} run --rm docker.io/library/alpine:latest echo "post-reboot-ok" 2>&1 | qgrep "post-reboot-ok"; then
             pass "rootful container runs after reboot"
         else
             fail "rootful container run failed after reboot"
         fi
 
         echo "--- rootless container runs after reboot ---"
-        if run_as_testuser "${PODMAN} run --rm docker.io/library/alpine:latest echo 'post-reboot-rootless-ok'" 2>&1 | grep -q "post-reboot-rootless-ok"; then
+        if run_as_testuser "${PODMAN} run --rm docker.io/library/alpine:latest echo 'post-reboot-rootless-ok'" 2>&1 | qgrep "post-reboot-rootless-ok"; then
             pass "rootless container runs after reboot"
         else
             fail "rootless container run failed after reboot"
@@ -937,7 +947,7 @@ tier6() {
         fi
 
         echo "--- ldconfig still clean after reboot ---"
-        if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+        if ldconfig -p 2>/dev/null | qgrep "/snap/m0x41-podman/"; then
             fail "snap libraries in ldconfig cache after reboot"
         else
             pass "ldconfig clean after reboot"
@@ -952,7 +962,7 @@ tier6() {
         fi
 
         echo "--- quadlet still works after reboot ---"
-        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | grep -q "5.8.5"; then
+        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | qgrep "5.8.6"; then
             pass "quadlet functional after reboot"
         else
             fail "quadlet broken after reboot"
@@ -1034,14 +1044,14 @@ tier6_removal() {
     fi
 
     echo "--- ldconfig still clean ---"
-    if ldconfig -p 2>/dev/null | grep -q "/snap/m0x41-podman/"; then
+    if ldconfig -p 2>/dev/null | qgrep "/snap/m0x41-podman/"; then
         fail "snap libraries in ldconfig cache after removal"
     else
         pass "ldconfig cache clean after removal"
     fi
 
     echo "--- no ld.so.conf.d entries ---"
-    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | grep -q .; then
+    if ls /etc/ld.so.conf.d/*podman* 2>/dev/null | qgrep .; then
         fail "podman ld.so.conf.d file remains after removal"
     else
         pass "no podman ld.so.conf.d entries after removal"

@@ -2,7 +2,9 @@
 
 This document records every known test failure in the `m0x41-podman` snap test suite, grouped by tier. Each failure indicates whether it occurs in LXC containers, LXD VMs, or both, along with the root cause classification.
 
-Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`) on Ubuntu 24.04 (LXD VM). Tiers 1–6 were run in both an LXD container and an LXD VM; Tier 7 (full BATS) was run in the VM in both root and rootless modes. The LXC-vs-VM recovery analysis in the Tier 7 section is carried from the original 2026-04-06 baseline, since Tier 7 was not re-run under LXC for this bump; the VM figures below reflect the v5.8.5 run.
+Last re-validated 2026-08-15 against _Podman_ v5.8.6 (`v5.8.6+snap1`) on Ubuntu 24.04 (LXD VM). Tiers 1–6 were run in both an LXD container and an LXD VM; Tier 7 (full BATS) was run in the VM in both root and rootless modes. The LXC-vs-VM recovery analysis in the Tier 7 section is carried from the original 2026-04-06 baseline, since Tier 7 was not re-run under LXC for this bump; the VM figures below reflect the v5.8.6 run.
+
+Figures postdate the `pipefail`/`grep -q` harness fix in [investigations/RCCA-PIPEFAIL-GREPQ.md](investigations/RCCA-PIPEFAIL-GREPQ.md). Before that fix, assertions piping a slow producer into `grep -q` could report a successful match as a failure, so a handful of failures in earlier baselines were spurious.
 
 ## Summary
 
@@ -13,10 +15,10 @@ Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`) on Ubuntu 
 | 3 | 0 | 0 | |
 | 4 | 3 | 3 | Same 3 snap config failures in both |
 | 5a-d | 0 | 0 | |
-| 5e | 5 | 2 | VM recovers 3 (environment + `htpasswd`) |
+| 5e | 3 | 2 | VM recovers 1 (`userns`, needs full kernel) |
 | 5g | — | 0 | VM only; no LXC data |
 | 6 | — | 0 | VM only |
-| 7 (root) | — | 22 of 607 applicable | 179 skipped (pasta, SELinux, etc.); adapted shim recovers to 638/786 combined |
+| 7 (root) | — | 21 of 607 applicable | 179 skipped (pasta, SELinux, etc.); adapted shim recovers to 639/786 combined |
 | 7 (rootless) | — | 23 of 610 applicable | 87 skipped + 89 `pasta` not applicable; adapted shim recovers to 711/786 combined |
 
 ---
@@ -71,15 +73,13 @@ No failures.
 
 ### 5e: Upstream BATS Quadlet and System-Service Tests
 
-**LXC:** 68/73 | **VM:** 71/73
+**LXC:** 70/73 | **VM:** 71/73
 
 | Test | File | Environment | Root Cause |
 |------|------|-------------|------------|
 | `quadlet - basic` | `252-quadlet.bats` | Both | Quadlet-generated unit times out waiting for container output (`STARTED CONTAINER` never seen) |
 | `quadlet - envvar` | `252-quadlet.bats` | Both | Environment variable passthrough differs under snap shim |
 | `quadlet - userns` | `252-quadlet.bats` | LXC only | LXD container lacks full user namespace support for this test |
-| `quadlet - image files` | `252-quadlet.bats` | LXC only | Passes in VM with full kernel isolation |
-| `quadlet - artifact` | `252-quadlet.bats` | LXC only | Passes in VM with `apache2-utils` (`htpasswd`) installed |
 
 Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `251-system-service.bats` (19/19), and `270-socket-activation.bats` (3/3) pass in both environments.
 
@@ -93,9 +93,11 @@ No failures. For both rootful and rootless: transient timers are created, `ExecS
 
 ## Tier 6: Host-Side Impact (VM Only)
 
-**VM:** 29/29 pass
+**VM:** 31/31 pass
 
-No failures across network integrity (5), library path integrity (3), systemd health (3), reboot survival (9), and snap removal cleanup (9).
+No failures across network integrity (5), library path integrity (3), systemd health (3), reboot survival (9), and snap removal cleanup (11).
+
+Tier 6 requires a VM that has not run the Tier 7 BATS suite: the upstream suite leaves failed transient units behind (`container-c_image_*`, `podman-kube@-tmp-podman_bats.*`) which the 6c assertion then attributes to the snap.
 
 ---
 
@@ -134,7 +136,7 @@ These tests pass when the shim respects pre-existing config environment variable
 | `containers.conf read-only` | `800-config.bats` |
 | `containers.conf tmpdir` | `800-config.bats` |
 
-The `generate systemd` / `runlabel` binary-path failures noted in earlier baselines no longer occur: `250-systemd.bats`, `255-auto-update.bats`, and `037-runlabel.bats` pass in root mode on v5.8.5. The `generate-systemd-binary-path.patch` (`PODMAN_BINARY` override) makes generated units reference the shim at `/usr/local/bin/podman` rather than the snap-internal path — confirmed in the Tier 5 dry-run assertions and directly in the `250-systemd` output. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md) for the original analysis.
+The `generate systemd` / `runlabel` binary-path failures noted in earlier baselines no longer occur: `250-systemd.bats`, `255-auto-update.bats`, and `037-runlabel.bats` pass in root mode on v5.8.6. The `generate-systemd-binary-path.patch` (`PODMAN_BINARY` override) makes generated units reference the shim at `/usr/local/bin/podman` rather than the snap-internal path — confirmed in the Tier 5 dry-run assertions and directly in the `250-systemd` output. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md) for the original analysis.
 
 ### Rootless Mode (VM)
 

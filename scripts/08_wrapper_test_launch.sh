@@ -53,8 +53,10 @@ test_distro() {
         fi
 
         # --- Wait for networking ---
+        # 60s is not enough when several distros are launched at once on a
+        # loaded host; the container is up but DHCP has not settled yet.
         NET_OK=false
-        for _ in $(seq 1 60); do
+        for _ in $(seq 1 180); do
             if lxc exec "${container}" -- ping -c1 -W1 1.1.1.1 &>/dev/null; then
                 NET_OK=true; break
             fi

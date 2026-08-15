@@ -2,7 +2,9 @@
 
 Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
-Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`). Tiers 1–6 run in an LXD container and VM; the full BATS suite (Tier 7) run in the VM in both modes.
+Last re-validated 2026-08-15 against _Podman_ v5.8.6 (`v5.8.6+snap1`). Tiers 1–6 run in an LXD container and VM; the full BATS suite (Tier 7) run in the VM in both modes.
+
+Results in this document were produced after the `pipefail`/`grep -q` harness fix described in [investigations/RCCA-PIPEFAIL-GREPQ.md](investigations/RCCA-PIPEFAIL-GREPQ.md). Earlier baselines carry a small number of spurious failures from that race, so tier 5 figures are not directly comparable across the fix.
 
 ## `core22` Snap — Single Distro (Ubuntu 24.04)
 
@@ -13,8 +15,12 @@ Last re-validated 2026-07-11 against _Podman_ v5.8.5 (`v5.8.5+snap1`). Tiers 1�
 | 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
 | 4 | 29/31 | 29/31 | `BATS` parity — 2 snap-specific failures (see [Known Failures](#known-failures)) |
 | 5a-5d,5g | 50/50 pass | 50/50 pass | Install hook, Quadlet dry-run (incl. Entrypoint= clearing and HealthCmd quote regression assertions), live rootful/rootless Quadlet, healthcheck transient unit validation |
-| 5e | 68/73 | 71/73 | `BATS` system-service, socket-activation, quadlet 252-254 |
-| 6 | — | 31/31 pass | Host-side impact: network, ldconfig, systemd, reboot, removal |
+| 5e | 70/73 | 71/73 | `BATS` system-service, socket-activation, quadlet 252-254 |
+| 6 | — | 31/31 pass | Host-side impact: network, ldconfig, systemd, reboot survival, removal |
+
+Tier 5e in LXC improved from 68/73 to 70/73 on v5.8.6: `quadlet - image files` and `quadlet - artifact` now pass under LXC, leaving `basic`, `envvar`, and `userns`.
+
+Tier 6 must be run on a VM that has **not** run the Tier 7 BATS suite. The upstream suite deliberately leaves failed transient units behind (`container-c_image_*`, `podman-kube@-tmp-podman_bats.*`), which the 6c "no failed units from snap" assertion then attributes to the snap. The figures above come from a VM that ran Tiers 1–6 only.
 
 ## `core22` Snap — Multi-Distro
 
@@ -67,7 +73,7 @@ Both are structural snap differences, not functional regressions. The same tests
 
 ### Tier 5e: `252-quadlet.bats` Failures
 
-In LXC: 5 failures — `basic`, `envvar`, `userns`, `image files`, and `artifact`. In the VM: 2 failures — `basic` (times out waiting for `STARTED CONTAINER`) and `envvar` (environment variable passthrough differs under snap shim). The remaining 3 LXC-only failures are resolved by the full VM kernel and `apache2-utils`. Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `251-system-service.bats` (19/19), and `270-socket-activation.bats` (3/3) pass in both environments.
+In LXC: 3 failures — `basic`, `envvar`, and `userns`. In the VM: 2 failures — `basic` (times out waiting for `STARTED CONTAINER`) and `envvar` (environment variable passthrough differs under snap shim). The remaining LXC-only failure (`userns`) is resolved by the full VM kernel. Tests `253-podman-quadlet.bats` (9/9), `254-podman-quadlet-multi.bats` (5/5), `251-system-service.bats` (19/19), and `270-socket-activation.bats` (3/3) pass in both environments.
 
 ### Fedora: Rootless Failures in LXD
 
@@ -94,7 +100,7 @@ Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fa
 
 ## Full Upstream BATS Suite
 
-In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (786 tests on v5.8.5). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
+In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (786 tests on v5.8.6). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
 
 ### Running the Full Suite
 
@@ -120,7 +126,7 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 | Category | Tests | Pass | Skip | Fail |
 |----------|-------|------|------|------|
 | System & Info | 116 | 89 | 12 | 15 |
-| Container Lifecycle | 150 | 137 | 11 | 2 |
+| Container Lifecycle | 150 | 138 | 11 | 1 |
 | Images | 104 | 102 | 2 | 0 |
 | Volumes & Storage | 59 | 55 | 3 | 1 |
 | Networking | 111 | 21 | 89 | 1 |
@@ -128,11 +134,11 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 | Systemd & Quadlet | 113 | 97 | 14 | 2 |
 | Security & Namespaces | 47 | 21 | 26 | 0 |
 | Advanced | 27 | 8 | 19 | 0 |
-| **Total** | **786** | **585** | **179** | **22** |
+| **Total** | **786** | **586** | **179** | **21** |
 
-Of the 786 tests, 179 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **607 applicable tests**: **585 pass (96.4%)** on Pass 1. The 22 residual failures are structural (`podman-testing` infra (11), timing, `slirp4netns` vs `pasta`). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
+Of the 786 tests, 179 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **607 applicable tests**: **586 pass (96.5%)** on Pass 1. The 21 residual failures are structural (`podman-testing` infra (11), timing, `slirp4netns` vs `pasta`). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
 
-The adapted shim (config env vars set conditionally, respecting pre-existing values) re-runs the config-sensitive files in Pass 2, recovering to **638/786 combined**.
+The adapted shim (config env vars set conditionally, respecting pre-existing values) re-runs the config-sensitive files in Pass 2, recovering to **639/786 combined**.
 
 ### Results — Rootless Mode (Ubuntu 24.04, VM)
 
@@ -178,7 +184,7 @@ These tests can only run in a VM because they validate system-level side effects
 
 ## Test Environment
 
-**Bare-metal** (host environment established 2026-04-01; v5.8.5 re-validation 2026-07-11):
+**Bare-metal** (host environment established 2026-04-01; v5.8.6 re-validation 2026-08-15):
 
 - **Host**: Intel i7-8700, 125 GB RAM, Linux 6.8.0-100-generic (Ubuntu)
 - **LXD**: 5.21.4 LTS (snap)

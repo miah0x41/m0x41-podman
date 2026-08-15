@@ -11,7 +11,7 @@ The snap is validated with a seven-tier test suite. Tiers 1-5 form the core regr
 | 1 | Snap Command Validation | 7 | The snap binary runs, reports correct versions, and finds all bundled components (`crun`, `netavark`, `conmon`, overlay driver, config paths) |
 | 2 | Rootless Functional | 8 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping — all as an unprivileged user |
 | 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
-| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.5 source tree, with `PODMAN` pointed at the snap binary |
+| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.6 source tree, with `PODMAN` pointed at the snap binary |
 | 5 | Quadlet / Install Hook | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), healthcheck transient unit validation, Go e2e quadlet tests (gated) |
 | 6 | Host-Side Impact (VM) | 25+ | Network integrity, [library path poisoning](investigations/RCCA-LIBRARY-POISONING.md), systemd health, reboot survival, snap removal cleanup — requires full VM |
 | 7 | Full Upstream BATS (on-demand) | 785 | All upstream `test/system/*.bats` files in both root and rootless modes, with categorised failure classification |
@@ -104,6 +104,8 @@ Tier 6 runs automatically as part of `all` when using the VM launcher. It can al
 /usr/bin/sg lxd -c "lxc exec m0x41-podman-test-vm -- /root/05_run_tests.sh tier6_removal"
 ```
 
+**Run tier 6 before tier 7, or on a separate VM.** The upstream BATS suite deliberately leaves failed transient units behind (`container-c_image_*`, `podman-kube@-tmp-podman_bats.*`). The 6c "no failed units from snap" assertion cannot tell those apart from units the snap left, so running tier 6 after tier 7 on the same VM produces two false failures.
+
 ### Tier 7: Full Upstream BATS (On-Demand)
 
 Runs all 76 upstream BATS test files in both root and rootless modes. Requires `04_test_setup.sh` to have run (Go, BATS, _Podman_ source). This can be run inside either an LXC container or a VM, but VM results are more authoritative because LXD container limitations are eliminated.
@@ -123,4 +125,27 @@ Runs all 76 upstream BATS test files in both root and rootless modes. Requires `
 /usr/bin/sg lxd -c "lxc exec m0x41-podman-test -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-test-22-centos-9 -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- bash"
+```
+
+## Writing Assertions
+
+The test scripts run under `set -euo pipefail`. Do **not** pipe into `grep -q`:
+
+```bash
+# Wrong — intermittently reports a successful match as a failure
+if some_command | grep -q "pattern"; then
+
+# Right
+if some_command | qgrep "pattern"; then       # qgrepE for extended regex
+```
+
+`grep -q` exits as soon as it matches, which SIGPIPEs a producer that is still writing. Under `pipefail` the pipeline then reports the producer's `141` instead of grep's `0`, so the assertion fails despite matching. The `qgrep`/`qgrepE` helpers use `grep -c`, which reads to EOF, keeping the same exit semantics without the race.
+
+This is only a hazard when the producer is slow enough to still be writing when grep exits — `su -` into `systemctl --user`, or a `podman` invocation — which is what made it present as flaky infrastructure rather than a bug. See [investigations/RCCA-PIPEFAIL-GREPQ.md](investigations/RCCA-PIPEFAIL-GREPQ.md).
+
+Matching against a variable or file needs no pipe at all, and is preferable:
+
+```bash
+if [[ "${output}" == *"pattern"* ]]; then
+if grep -q "pattern" "${file}"; then          # no pipe, no producer to signal
 ```

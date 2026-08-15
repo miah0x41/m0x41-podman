@@ -180,7 +180,9 @@ for wants_dir in /etc/systemd/system/default.target.wants \
     for link in "${wants_dir}"/podman*; do
         [ -L "${link}" ] || continue
         target=$(readlink "${link}" 2>/dev/null)
-        echo "${target}" | grep -q m0x41-podman && continue
+        # Pattern match rather than `| grep -q`: under `set -o pipefail` grep's
+        # early exit can SIGPIPE the producer and mask a successful match.
+        case "${target}" in *m0x41-podman*) continue ;; esac
         [ -f "${target}" ] && continue
         if [ "${STALE_FOUND}" = false ]; then
             echo "" >&2

@@ -15,12 +15,16 @@ SNAP_REV=$(basename "$(readlink -f /snap/m0x41-podman/current)")
 # `snap run`. On Ubuntu, `snap run` may swallow the wrapper's stderr.
 # This tests the wrapper logic itself, which is the purpose of this suite.
 SNAP="/snap/m0x41-podman/current"
-PODMAN_ENV="SNAP=${SNAP} SNAP_VERSION=5.8.5 SNAP_REVISION=${SNAP_REV}"
+PODMAN_ENV="SNAP=${SNAP} SNAP_VERSION=5.8.6 SNAP_REVISION=${SNAP_REV}"
 PODMAN_CMD="${SNAP}/bin/podman-wrapper"
 
 pass() { echo "  PASS: $1"; }
 fail() { echo "  FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 FAILURES=0
+
+# See 05_run_tests.sh: `grep -q` exits on first match and SIGPIPEs the producer,
+# which `set -o pipefail` reports as a failed pipeline. `grep -c` reads to EOF.
+qgrep() { grep -c -e "$1" >/dev/null; }
 
 run_as_testuser() {
     local cmd="$1" output_file="${2:-}"
@@ -64,7 +68,7 @@ echo "===== PHASE 1: Root Invocation ====="
 
 echo "--- root: no hello message ---"
 ROOT_OUT=$(${PODMAN_ENV} ${PODMAN_CMD} --version 2>&1) || true
-if echo "${ROOT_OUT}" | grep -q "Welcome to m0x41-podman"; then
+if echo "${ROOT_OUT}" | qgrep "Welcome to m0x41-podman"; then
     fail "root: hello message shown (should be suppressed)"
 else
     pass "root: no hello message"
@@ -72,7 +76,7 @@ fi
 
 echo "--- root: no dependency warning ---"
 ROOT_OUT2=$(${PODMAN_ENV} ${PODMAN_CMD} --version 2>&1) || true
-if echo "${ROOT_OUT2}" | grep -q "WARNING: missing host dependencies"; then
+if echo "${ROOT_OUT2}" | qgrep "WARNING: missing host dependencies"; then
     fail "root: dependency warning shown (should be suppressed)"
 else
     pass "root: no dependency warning"

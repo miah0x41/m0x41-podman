@@ -4,6 +4,39 @@ All notable changes to the `m0x41-podman` snap package are documented here.
 
 Version format: `{upstream_podman_version}+snap{N}` — the suffix tracks snap packaging revisions independent of the upstream _Podman_ release.
 
+## v5.8.6+snap1
+
+Upstream bump to _Podman_ v5.8.6, plus a test-harness fix uncovered while validating it. The only shipped changes are the version string in `scripts/podman-wrapper` and one hardening change in `snap/hooks/install`; snap behaviour is otherwise unchanged.
+
+**Upstream:** [Podman v5.8.6](https://github.com/containers/podman/releases/tag/v5.8.6) release notes
+
+A single-issue security release, and the one issue lands squarely on this snap's _Quadlet_ support:
+
+- **CVE-2026-19730**: `podman quadlet install --replace` opened the destination file without truncating it, so replacing a longer Quadlet with a shorter one left trailing bytes of the original file in place. The resulting hybrid unit could still parse and start, silently running directives the user believed they had removed ([GHSA-fx76-2j3w-2mx6](https://github.com/podman-container-tools/podman/security/advisories/GHSA-fx76-2j3w-2mx6)).
+
+The fix rewrites the install path to write through a temporary file in the destination directory and rename it into place, and to open with `O_EXCL` in the non-replace case so the existence check is no longer racy. The same commit corrects asset-file naming for supported _Quadlet_ extensions. Nothing else changed upstream: the release touches only `pkg/domain/infra/abi/quadlet.go`, its BATS test, the version constant, and packaging metadata.
+
+### Changes
+
+- `snapcraft.yaml` `version` and `source-tag` updated to `5.8.6` / `v5.8.6`
+- Both patches (`patches/generate-systemd-binary-path.patch`, `patches/healthcheck-ld-library-path.patch`) apply cleanly against v5.8.6 with no changes; v5.8.6 touches none of the patched files
+- All current-version references across `README.md`, `docs/`, and test scripts bumped from v5.8.5 to v5.8.6. The tier 5 fix-attribution comments (#28213, #28409) retain their `v5.8.2` references, since those fixes first landed in that release
+- Post-incident investigation documents (`docs/investigations/`) retain their original references, since they describe historical analysis performed against earlier source trees
+- `docs/TESTING-RESULTS.md` and `docs/TEST-FAILURES.md` refreshed with the v5.8.6 re-validation
+
+### Test Harness Fix
+
+Validation of this release surfaced a long-standing race in the test scripts that produced spurious failures, most visibly `rootless healthcheck transient timer not found` in tier 5. Under `set -o pipefail`, `grep -q` exits the moment it matches and SIGPIPEs a producer that is still writing; the pipeline then reports the producer's `141` instead of grep's `0`, turning a successful match into a reported failure. Whether it bites depends on which process finishes first, so it fired intermittently and only behind slow producers such as `su -` into `systemctl --user`.
+
+The defect is confined to the harness — the healthcheck itself was verified working in every failing run — and predates this release, failing more often on v5.8.5 (5 of 9 runs) than on v5.8.6 (7 of 17). Full analysis in [`docs/investigations/RCCA-PIPEFAIL-GREPQ.md`](docs/investigations/RCCA-PIPEFAIL-GREPQ.md).
+
+- `qgrep`/`qgrepE` helpers (using `grep -c`, which reads to EOF) replace `grep -q` at all 49 piped call sites in `scripts/05_run_tests.sh`, `scripts/10_wrapper_tests.sh`, and `scripts/upgrade-snap.sh`
+- `snap/hooks/install` uses a `case` pattern match instead of piping into `grep -q`
+- `scripts/08_wrapper_test_launch.sh` waits up to 180s rather than 60s for container networking, which was timing out when five distros launch at once on a loaded host
+- `scripts/09_wrapper_test_setup.sh` retries `snap install` around seeding instead of letting `snap wait system seed.loaded` fail silently, fixing `device not yet seeded` on images where snapd ships preinstalled
+- Tier 5 re-run 6 times per version after the fix: 0 failures, against 12 failures in the 26 runs before it
+- `docs/TESTING.md` gains a "Writing Assertions" section covering the `grep -q` rule, and records that tier 6 must run before tier 7 (or on a separate VM) because the upstream BATS suite leaves failed transient units that tier 6's 6c assertion attributes to the snap
+
 ## v5.8.5+snap1
 
 Upstream bump to _Podman_ v5.8.5 (rolling up v5.8.3, v5.8.4, and v5.8.5). No packaging changes.
