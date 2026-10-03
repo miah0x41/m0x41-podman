@@ -4,6 +4,35 @@ All notable changes to the `m0x41-podman` snap package are documented here.
 
 Version format: `{upstream_podman_version}+snap{N}` — the suffix tracks snap packaging revisions independent of the upstream _Podman_ release.
 
+## v5.8.8+snap1
+
+Upstream bump to _Podman_ v5.8.8 (rolling up v5.8.7), plus regression tests for the security fixes it carries. The only shipped change is the version string in `scripts/podman-wrapper`; snap behaviour is otherwise unchanged.
+
+**Upstream:** [Podman v5.8.7](https://github.com/containers/podman/releases/tag/v5.8.7), [v5.8.8](https://github.com/containers/podman/releases/tag/v5.8.8) release notes
+
+Both are security releases, and both reach code paths this snap ships:
+
+- **CVE-2025-11395** (v5.8.7): crafted tar archives could overwrite or change attributes of host files when extracted by `podman load` (and other `oci-archive:` consumers) or `podman volume import` ([GHSA-3gcv-x57j-xqxv](https://github.com/podman-container-tools/container-libs/security/advisories/GHSA-3gcv-x57j-xqxv)). The fix confines archive extraction and OCI layout reads to an `os.Root`. v5.8.7 also picks up CVE-2026-79699 and CVE-2026-79705, which upstream does not believe are reachable from the _Podman_ CLI, via Buildah v1.43.4, Common v0.67.2, Image v5.39.3, and Storage v1.62.1.
+- **CVE-2026-94603** (v5.8.8): `podman run` treated any image carrying the `io.podman.annotations.checkpoint.runtime.name` annotation as a checkpoint and restored it with the checkpoint's own security configuration, silently discarding user flags such as `--cap-drop=ALL` ([GHSA-2cvf-wqm6-wr9g](https://github.com/podman-container-tools/podman/security/advisories/GHSA-2cvf-wqm6-wr9g)). **Breaking change:** running checkpoint images via `podman run` is removed; it now fails with exit 125 and points at `podman container restore`. Restoring checkpoints requires CRIU, which this snap does not bundle, so no previously working snap workflow is lost.
+
+### Changes
+
+- `snapcraft.yaml` `version` and `source-tag` updated to `5.8.8` / `v5.8.8`
+- Both patches apply cleanly against v5.8.8; v5.8.7 and v5.8.8 touch none of the patched files
+- Upstream `go.mod` now declares `go 1.26.0` (was `1.25.0`). The bootstrap Go 1.24.2 still builds it, fetching the `go1.26.0` toolchain on demand through the default `GOTOOLCHAIN=auto`; `docs/COMPONENTS.md` and `docs/DEVELOPMENT.md` now say so
+- All current-version references across `README.md`, `docs/`, and test scripts bumped from v5.8.6 to v5.8.8. Investigation documents retain their original references
+
+### New Tests
+
+- `security_regressions` in `scripts/05_run_tests.sh`, called from Tier 2 (rootless) and Tier 3 (rootful), adds four checks per mode: checkpoint-annotated images are refused by `podman run`, an oci-archive whose `index.json` symlinks outside the archive is rejected by `podman load` (with a well-formed control that must still load), and `podman volume import` cannot write through an escaping symlink
+- The checkpoint and oci-archive checks were run against the v5.8.6 snap first and fail there in both modes, so they catch a regression to a vulnerable build; the volume import check is a confinement guard that v5.8.6 already passed
+- `scripts/07_test_setup_multi.sh` installs `tar` on Fedora and CentOS; CentOS 9 Stream omits it and the fixtures need GNU `tar --transform`
+- `docs/TESTING.md` documents the checks in a new "Security Regression Checks" section
+
+### Validation
+
+Full 7-tier matrix. Tiers 1–5 in an LXD container reinstalled over v5.8.6 (refresh path), Tiers 1–6 on a fresh LXD VM including reboot survival, multi-distro and wrapper suites on five distros, then Tier 7 on the VM. Results match the v5.8.6 baseline or improve on it: Tier 7 rootless 588/786 (712/786 combined, up from 711), root 585/786 (638/786 combined). The one new root failure, `037-runlabel`, is a harness artefact of running Tier 7 under `systemd-run` without `HOME`, and it passes once `HOME` is set. `docs/TESTING-RESULTS.md` and `docs/TEST-FAILURES.md` are refreshed accordingly, and `docs/TEST-FAILURES.md` now records Tier 4 correctly as 29/31.
+
 ## v5.8.6+snap1
 
 Upstream bump to _Podman_ v5.8.6, plus a test-harness fix uncovered while validating it. The only shipped changes are the version string in `scripts/podman-wrapper` and one hardening change in `snap/hooks/install`; snap behaviour is otherwise unchanged.

@@ -46,8 +46,8 @@ tier1() {
     echo "===== TIER 1: Snap Command Validation ====="
 
     echo "--- snap command reports version ---"
-    if ${PODMAN} --version 2>&1 | qgrep "5.8.6"; then
-        pass "snap command reports 5.8.6"
+    if ${PODMAN} --version 2>&1 | qgrep "5.8.8"; then
+        pass "snap command reports 5.8.8"
     else
         fail "snap command version check"
     fi
@@ -99,6 +99,79 @@ tier1() {
     else
         fail "conmon path '${CONMON}' not inside snap"
     fi
+}
+
+# shellcheck disable=SC2317  # invoked indirectly via security_regressions
+run_as_root() {
+    bash -c "$1"
+}
+
+# ---------- Security Regression Checks (shared by Tiers 2 and 3) ----------
+# Guards against the upstream fixes shipped in v5.8.7 and v5.8.8. The
+# checkpoint and oci-archive checks both fail on v5.8.6, so they detect a
+# regression to a vulnerable build; the volume import check is a confinement
+# guard that v5.8.6 already passed.
+# Usage: security_regressions <rootless|rootful> <run_as_testuser|run_as_root>
+security_regressions() {
+    local mode="$1" run="$2"
+    local work victim hostidx out rc
+    work=$(mktemp -d)
+    victim=$(mktemp -d)
+    hostidx=$(mktemp -d)
+    chmod 755 "${work}" "${hostidx}"
+    if [ "${mode}" = "rootless" ]; then
+        chown "${TESTUSER}:${TESTUSER}" "${work}" "${victim}" "${hostidx}"
+    fi
+
+    echo "--- CVE-2026-94603: podman run rejects checkpoint images (${mode}) ---"
+    # v5.8.6 and earlier treat any image carrying this annotation as a
+    # checkpoint and restore it, ignoring user flags such as --cap-drop=ALL
+    "${run}" "mkdir -p ${work}/ctx && printf 'FROM docker.io/library/alpine:latest\nCMD [\"true\"]\n' > ${work}/ctx/Containerfile && ${PODMAN} build -q --annotation io.podman.annotations.checkpoint.runtime.name=crun -t cvetest-ckpt ${work}/ctx" >/dev/null 2>&1 || true
+    out=$("${run}" "${PODMAN} run --rm --cap-drop=ALL cvetest-ckpt" 2>&1) && rc=0 || rc=$?
+    if [ "${rc}" -eq 125 ] && echo "${out}" | qgrep "must be started using \`podman container restore\`"; then
+        pass "${mode} checkpoint image refused by podman run"
+    else
+        fail "${mode} checkpoint image not refused (rc=${rc}): ${out}"
+    fi
+    "${run}" "${PODMAN} rmi -f cvetest-ckpt" >/dev/null 2>&1 || true
+
+    echo "--- CVE-2025-11395: oci-archive with escaping index.json symlink (${mode}) ---"
+    # The archive is valid except that index.json is a symlink to a copy
+    # outside the archive. v5.8.6 follows it and loads the image.
+    if "${run}" "${PODMAN} save -q --format oci-archive -o ${work}/good.tar docker.io/library/alpine:latest" >/dev/null 2>&1; then
+        "${run}" "mkdir -p ${work}/oci && tar -xf ${work}/good.tar -C ${work}/oci && mv ${work}/oci/index.json ${hostidx}/index.json && ln -s ${hostidx}/index.json ${work}/oci/index.json && tar -cf ${work}/evil.tar -C ${work}/oci ." >/dev/null 2>&1 || true
+        out=$("${run}" "${PODMAN} load -i ${work}/evil.tar" 2>&1) && rc=0 || rc=$?
+        if [ ! -L "${work}/oci/index.json" ] || [ ! -s "${work}/evil.tar" ]; then
+            fail "${mode} could not build escaping oci-archive fixture (is tar installed?)"
+        elif [ "${rc}" -ne 0 ]; then
+            pass "${mode} oci-archive with escaping symlink rejected"
+        else
+            fail "${mode} oci-archive with escaping symlink loaded: ${out}"
+        fi
+        if "${run}" "${PODMAN} load -q -i ${work}/good.tar" >/dev/null 2>&1; then
+            pass "${mode} well-formed oci-archive still loads"
+        else
+            fail "${mode} well-formed oci-archive failed to load"
+        fi
+    else
+        fail "${mode} could not save oci-archive fixture"
+    fi
+
+    echo "--- CVE-2025-11395: volume import cannot write through a symlink (${mode}) ---"
+    "${run}" "mkdir -p ${work}/s1 ${work}/s2/x && ln -s ${victim} ${work}/s1/esc && echo pwned > ${work}/s2/x/pwned && tar -cf ${work}/vol.tar -C ${work}/s1 esc && tar -rf ${work}/vol.tar -C ${work}/s2 --transform 's,^x,esc,' x/pwned" >/dev/null 2>&1 || true
+    # Without a volume the import never runs, and an untouched victim dir
+    # would pass vacuously
+    if ! "${run}" "${PODMAN} volume create cvetest-vol" >/dev/null 2>&1; then
+        fail "${mode} could not create volume for import check"
+    elif { "${run}" "${PODMAN} volume import cvetest-vol ${work}/vol.tar" >/dev/null 2>&1 || true; } \
+        && [ -s "${work}/vol.tar" ] && [ ! -e "${victim}/pwned" ]; then
+        pass "${mode} volume import confined to volume"
+    else
+        fail "${mode} volume import wrote outside the volume (or fixture missing)"
+    fi
+    "${run}" "${PODMAN} volume rm -f cvetest-vol" >/dev/null 2>&1 || true
+
+    rm -rf "${work}" "${victim}" "${hostidx}"
 }
 
 # ---------- Tier 2: Rootless Functional Tests ----------
@@ -161,6 +234,8 @@ CEOF
         fail "rootless DNS resolution"
     fi
 
+    security_regressions rootless run_as_testuser
+
     echo "--- cleanup rootless ---"
     run_as_testuser "${PODMAN} system prune -af" 2>&1 || true
     pass "rootless system prune"
@@ -210,6 +285,8 @@ CEOF
     else
         fail "rootful volume lifecycle"
     fi
+
+    security_regressions rootful run_as_root
 
     echo "--- cleanup rootful ---"
     ${PODMAN} system prune -af 2>&1 || true
@@ -278,8 +355,8 @@ tier5() {
     fi
 
     echo "--- shim reports correct version ---"
-    if /usr/local/bin/podman --version 2>&1 | qgrep "5.8.6"; then
-        pass "shim reports 5.8.6"
+    if /usr/local/bin/podman --version 2>&1 | qgrep "5.8.8"; then
+        pass "shim reports 5.8.8"
     else
         fail "shim version check"
     fi
@@ -432,8 +509,8 @@ CEOF
     fi
 
     echo "--- quadlet version matches ---"
-    if "${QUADLET}" --version 2>&1 | qgrep "5.8.6"; then
-        pass "quadlet version is 5.8.6"
+    if "${QUADLET}" --version 2>&1 | qgrep "5.8.8"; then
+        pass "quadlet version is 5.8.8"
     else
         fail "quadlet version mismatch"
     fi
@@ -912,14 +989,14 @@ tier6() {
         fi
 
         echo "--- podman functional after reboot ---"
-        if ${PODMAN} --version 2>&1 | qgrep "5.8.6"; then
+        if ${PODMAN} --version 2>&1 | qgrep "5.8.8"; then
             pass "podman version correct after reboot"
         else
             fail "podman version check failed after reboot"
         fi
 
         echo "--- shim survives reboot ---"
-        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | qgrep "5.8.6"; then
+        if [ -x /usr/local/bin/podman ] && /usr/local/bin/podman --version 2>&1 | qgrep "5.8.8"; then
             pass "shim functional after reboot"
         else
             fail "shim broken after reboot"
@@ -962,7 +1039,7 @@ tier6() {
         fi
 
         echo "--- quadlet still works after reboot ---"
-        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | qgrep "5.8.6"; then
+        if "${SNAP}/usr/libexec/podman/quadlet" --version 2>&1 | qgrep "5.8.8"; then
             pass "quadlet functional after reboot"
         else
             fail "quadlet broken after reboot"

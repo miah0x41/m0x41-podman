@@ -6,7 +6,7 @@ The snap packages _Podman_ alongside its required runtime dependencies. Componen
 
 | Component | Version | License | SPDX | Upstream | How Bundled |
 |-----------|---------|---------|------|----------|-------------|
-| _Podman_ | v5.8.6 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source ([two patches](#source-modifications)) |
+| _Podman_ | v5.8.8 | Apache License 2.0 | `Apache-2.0` | [containers/podman](https://github.com/containers/podman) | Built from source ([two patches](#source-modifications)) |
 | `crun` | 1.19.1 | GNU GPL v2 or later | `GPL-2.0-or-later` | [containers/crun](https://github.com/containers/crun) | Built from source (unmodified) |
 | `netavark` | 1.14.1 | Apache License 2.0 | `Apache-2.0` | [containers/netavark](https://github.com/containers/netavark) | Pre-built binary from GitHub Releases |
 | `aardvark-dns` | 1.14.0 | Apache License 2.0 | `Apache-2.0` | [containers/aardvark-dns](https://github.com/containers/aardvark-dns) | Pre-built binary from GitHub Releases |
@@ -19,14 +19,14 @@ The snap packages _Podman_ alongside its required runtime dependencies. Componen
 
 | Component | Version | License | SPDX | Upstream |
 |-----------|---------|---------|------|----------|
-| `Go` | 1.24.2 | BSD 3-Clause | `BSD-3-Clause` | [go.dev](https://go.dev/dl/) |
+| `Go` | 1.24.2 bootstrap; builds with 1.26.0 | BSD 3-Clause | `BSD-3-Clause` | [go.dev](https://go.dev/dl/) |
 
 ## Why Each Component Is Needed
 
 | Component | Role |
 |-----------|------|
 | **_Podman_** | Container engine — the primary binary |
-| **`crun`** | OCI runtime — executes containers. Ubuntu 22.04/24.04's packaged `crun` is too old for _Podman_ v5.8.6 |
+| **`crun`** | OCI runtime — executes containers. Ubuntu 22.04/24.04's packaged `crun` is too old for _Podman_ v5.8.8 |
 | **`netavark`** | Container networking backend — sets up bridges, port forwarding, firewall rules |
 | **`aardvark-dns`** | DNS server for container networks — resolves container names |
 | **`conmon`** | Container monitor — holds stdio and manages container lifecycle after _Podman_ exits |

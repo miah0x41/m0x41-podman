@@ -24,10 +24,10 @@ This takes approximately 15-20 minutes. The output is a `.snap` file in the proj
 1. An Ubuntu 22.04 LXD container is created
 2. The `snapcraft` project files (`snapcraft.yaml`, `snap/`, `scripts/podman-wrapper`) are pushed into the container
 3. `snapcraft 7.x --destructive-mode` runs inside the container, which:
-   - Downloads and stages `Go` 1.24.2 (build-time only, excluded from the snap)
+   - Downloads and stages `Go` 1.24.2 as a bootstrap, which fetches the `go1.26.0` toolchain required by _Podman_'s `go.mod` (build-time only, excluded from the snap)
    - Clones and builds `crun` 1.19.1 from source
    - Downloads pre-built `netavark` v1.14.1 and `aardvark-dns` v1.14.0 binaries
-   - Clones _Podman_ v5.8.6 from source, applies the healthcheck and binary path patches, and builds
+   - Clones _Podman_ v5.8.8 from source, applies the healthcheck and binary path patches, and builds
    - Builds `conmon` 2.0.26 from source
    - Stages Ubuntu 22.04 packages: `catatonit`, `fuse-overlayfs`, `slirp4netns`, `iptables`
    - Bundles configuration files and the wrapper script
@@ -39,11 +39,11 @@ The snap definition (`snapcraft.yaml` at the repository root) uses `core22` as t
 
 | Part | Plugin | What It Does |
 |------|--------|-------------|
-| `go` | nil | Downloads `Go` 1.24.2. Excluded from the final snap (`prime: [-*]`) — build-time only |
+| `go` | nil | Downloads `Go` 1.24.2, which bootstraps the `go1.26.0` toolchain declared in _Podman_'s `go.mod` via `GOTOOLCHAIN=auto`. Excluded from the final snap (`prime: [-*]`) — build-time only |
 | `crun` | nil | Clones `crun` 1.19.1, runs `./autogen.sh && ./configure && make && make install` |
 | `conmon` | nil | Downloads and builds `conmon` 2.0.26 from source — upgraded from Ubuntu 22.04's v2.0.25 to fix stderr data loss |
 | `netavark` | nil | Downloads pre-built `netavark` and `aardvark-dns` binaries from GitHub Releases |
-| `podman` | nil | Clones _Podman_ v5.8.6, applies `patches/healthcheck-ld-library-path.patch` and `patches/generate-systemd-binary-path.patch`, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
+| `podman` | nil | Clones _Podman_ v5.8.8, applies `patches/healthcheck-ld-library-path.patch` and `patches/generate-systemd-binary-path.patch`, builds `podman`, `podman-remote`, `rootlessport`, `quadlet`, and man pages |
 | `configs` | dump | Copies `containers.conf`, `storage.conf`, `registries.conf`, `policy.json` into the snap |
 | `wrapper` | dump | Copies wrapper scripts (`podman-wrapper`, `conmon-wrapper`, `crun-wrapper`) that set `PATH` and `LD_LIBRARY_PATH` |
 
@@ -101,7 +101,7 @@ These are non-obvious problems discovered during development. They are handled i
 
 ### `crun` Version Floor
 
-Ubuntu 22.04 ships `crun` 1.8.x; Ubuntu 24.04 ships 1.14.1. _Podman_ v5.8.6 requires at least `crun` 1.14.3. Every `podman run` fails with `OCI runtime error: crun: unknown version specified` if `crun` is too old. The snap builds `crun` 1.19.1 from source.
+Ubuntu 22.04 ships `crun` 1.8.x; Ubuntu 24.04 ships 1.14.1. _Podman_ v5.8.8 requires at least `crun` 1.14.3. Every `podman run` fails with `OCI runtime error: crun: unknown version specified` if `crun` is too old. The snap builds `crun` 1.19.1 from source.
 
 ### `netavark` and `aardvark-dns` Not in Ubuntu 22.04
 
@@ -109,7 +109,7 @@ These packages were added in Ubuntu 23.10. The snap downloads pre-built binaries
 
 ### `passt`/`pasta` Not Available on Ubuntu 22.04
 
-_Podman_ v5.8.6 defaults to `pasta` for rootless networking, but `passt` was added in Ubuntu 23.04. The snap's `containers.conf` sets `default_rootless_network_cmd = "slirp4netns"` to use the bundled `slirp4netns` instead.
+_Podman_ v5.8.8 defaults to `pasta` for rootless networking, but `passt` was added in Ubuntu 23.04. The snap's `containers.conf` sets `default_rootless_network_cmd = "slirp4netns"` to use the bundled `slirp4netns` instead.
 
 ### `LD_LIBRARY_PATH` Does Not Propagate Through `conmon` → `crun`
 

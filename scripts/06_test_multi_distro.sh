@@ -13,8 +13,8 @@ RESULTS_FILE="${PROJECT_DIR}/multi-distro-results.txt"
 # Test counts per tier (must match 05_run_tests.sh)
 # Tier 5 count covers 5a-5d and 5g (5e/5f gated on Go/BATS, not available in multi-distro)
 TIER1_COUNT=7
-TIER2_COUNT=8
-TIER3_COUNT=6
+TIER2_COUNT=12
+TIER3_COUNT=10
 TIER5_COUNT=48
 
 # Parse args

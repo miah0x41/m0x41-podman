@@ -60,7 +60,7 @@ case "${ID}" in
         # shadow-utils: newuidmap/newgidmap; libgpg-error: snap bundles libgpgme but not this dep
         # iptables-nft: required by netavark for rootful container networking
         # dbus-daemon: D-Bus user session bus (rootless systemd units, journalctl --user)
-        dnf install -y shadow-utils libgpg-error iptables-nft dbus-daemon man-db 2>&1 | tail -3
+        dnf install -y shadow-utils libgpg-error iptables-nft dbus-daemon man-db tar 2>&1 | tail -3
 
         # SELinux blocks snap operations
         setenforce 0 2>/dev/null || true
@@ -80,7 +80,7 @@ case "${ID}" in
         dnf install -y snapd 2>&1 | tail -5
         # iptables-nft: required by netavark for rootful container networking
         # dbus-daemon: D-Bus user session bus (rootless systemd units, journalctl --user)
-        dnf install -y shadow-utils libgpg-error iptables-nft dbus-daemon man-db 2>&1 | tail -3
+        dnf install -y shadow-utils libgpg-error iptables-nft dbus-daemon man-db tar 2>&1 | tail -3
 
         setenforce 0 2>/dev/null || true
         ln -sf /var/lib/snapd/snap /snap 2>/dev/null || true

@@ -2,7 +2,7 @@
 
 Recorded results from the test tiers described in [TESTING.md](TESTING.md).
 
-Last re-validated 2026-08-15 against _Podman_ v5.8.6 (`v5.8.6+snap1`). Tiers 1–6 run in an LXD container and VM; the full BATS suite (Tier 7) run in the VM in both modes.
+Last re-validated 2026-10-03 against _Podman_ v5.8.8 (`v5.8.8+snap1`). Tiers 1–6 run in an LXD container and VM; the full BATS suite (Tier 7) run in the VM in both modes.
 
 Results in this document were produced after the `pipefail`/`grep -q` harness fix described in [investigations/RCCA-PIPEFAIL-GREPQ.md](investigations/RCCA-PIPEFAIL-GREPQ.md). Earlier baselines carry a small number of spurious failures from that race, so tier 5 figures are not directly comparable across the fix.
 
@@ -11,14 +11,16 @@ Results in this document were produced after the `pipefail`/`grep -q` harness fi
 | Tier | LXC Container | LXD VM | Description |
 |------|--------------|--------|-------------|
 | 1 | 7/7 pass | 7/7 pass | Version, `crun`, `netavark`, overlay, `conmon`, config paths |
-| 2 | 8/8 pass | 8/8 pass | Rootless: pull, run, build, pod, volume, unshare, DNS |
-| 3 | 6/6 pass | 6/6 pass | Rootful: run, build, pod, volume |
+| 2 | 12/12 pass | 12/12 pass | Rootless: pull, run, build, pod, volume, unshare, DNS, security regression checks |
+| 3 | 10/10 pass | 10/10 pass | Rootful: run, build, pod, volume, security regression checks |
 | 4 | 29/31 | 29/31 | `BATS` parity — 2 snap-specific failures (see [Known Failures](#known-failures)) |
 | 5a-5d,5g | 50/50 pass | 50/50 pass | Install hook, Quadlet dry-run (incl. Entrypoint= clearing and HealthCmd quote regression assertions), live rootful/rootless Quadlet, healthcheck transient unit validation |
 | 5e | 70/73 | 71/73 | `BATS` system-service, socket-activation, quadlet 252-254 |
 | 6 | — | 31/31 pass | Host-side impact: network, ldconfig, systemd, reboot survival, removal |
 
-Tier 5e in LXC improved from 68/73 to 70/73 on v5.8.6: `quadlet - image files` and `quadlet - artifact` now pass under LXC, leaving `basic`, `envvar`, and `userns`.
+Tier 5e is unchanged from v5.8.6: `basic`, `envvar`, and `userns` fail under LXC, and `basic` and `envvar` in the VM.
+
+On v5.8.8 the LXC run reinstalled over an existing v5.8.6 install, covering the refresh path, while the VM was freshly created and installed.
 
 Tier 6 must be run on a VM that has **not** run the Tier 7 BATS suite. The upstream suite deliberately leaves failed transient units behind (`container-c_image_*`, `podman-kube@-tmp-podman_bats.*`), which the 6c "no failed units from snap" assertion then attributes to the snap. The figures above come from a VM that ran Tiers 1–6 only.
 
@@ -26,15 +28,15 @@ Tier 6 must be run on a VM that has **not** run the Tier 7 BATS suite. The upstr
 
 All distros run in parallel via `06_test_multi_distro.sh`.
 
-| Distro | `glibc` | Tier 1 (7) | Tier 2 (8) | Tier 3 (6) | Tier 5 (50) |
+| Distro | `glibc` | Tier 1 (7) | Tier 2 (12) | Tier 3 (10) | Tier 5 (50) |
 |--------|---------|------------|------------|------------|-------------|
-| Ubuntu 22.04 | 2.35 | 7/7 | 8/8 | 6/6 | 50/50 |
-| Ubuntu 24.04 | 2.39 | 7/7 | 8/8 | 6/6 | 50/50 |
-| Debian 12 | 2.36 | 7/7 | 8/8 | 6/6 | 50/50 |
-| CentOS 9 | 2.34 | 7/7 | 8/8 | 6/6 | 50/50 |
-| Fedora 43 | 2.41 | 5/7 | 1/8 | 6/6 | 40/50 |
+| Ubuntu 22.04 | 2.35 | 7/7 | 12/12 | 10/10 | 50/50 |
+| Ubuntu 24.04 | 2.39 | 7/7 | 12/12 | 10/10 | 50/50 |
+| Debian 12 | 2.36 | 7/7 | 12/12 | 10/10 | 50/50 |
+| CentOS 9 | 2.34 | 7/7 | 12/12 | 10/10 | 50/50 |
+| Fedora 43 | 2.41 | 5/7 | 1/12 | 10/10 | 40/50 |
 
-Fedora 43 rootless failures are caused by `newuidmap` lacking the setuid bit inside LXD containers (see [Known Failures](#fedora-rootless-failures-in-lxd)). Rootful (tier 3) passes all 6 tests.
+Fedora 43 rootless failures are caused by `newuidmap` lacking the setuid bit inside LXD containers (see [Known Failures](#fedora-rootless-failures-in-lxd)). Rootful (tier 3) passes all 10 tests, including the security regression checks.
 
 ## Native Build (Ubuntu 24.04, VM)
 
@@ -77,7 +79,7 @@ In LXC: 3 failures — `basic`, `envvar`, and `userns`. In the VM: 2 failures �
 
 ### Fedora: Rootless Failures in LXD
 
-`newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 6 tests. Confirmed on both Fedora 42 and 43.
+`newuidmap` lacks the setuid bit inside LXD containers on Fedora. All rootless operations fail with `Operation not permitted`. This is an LXD/Fedora environment limitation — on a real Fedora host with setuid `newuidmap`, rootless would work. Rootful (tier 3) passes all 10 tests. Confirmed on both Fedora 42 and 43.
 
 ### Rootless Requires Host `uidmap` and `dbus-user-session`
 
@@ -100,7 +102,7 @@ Setting `firewall_driver = "nftables"` in `containers.conf` was attempted but fa
 
 ## Full Upstream BATS Suite
 
-In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (786 tests on v5.8.6). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
+In addition to the tiered regression tests above, the snap can be validated against the complete upstream _Podman_ BATS test suite (786 tests on v5.8.8). This provides a transparent view of compatibility — not all tests are expected to pass, and the results are categorised to explain why.
 
 ### Running the Full Suite
 
@@ -125,7 +127,7 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 
 | Category | Tests | Pass | Skip | Fail |
 |----------|-------|------|------|------|
-| System & Info | 116 | 89 | 12 | 15 |
+| System & Info | 116 | 88 | 12 | 16 |
 | Container Lifecycle | 150 | 138 | 11 | 1 |
 | Images | 104 | 102 | 2 | 0 |
 | Volumes & Storage | 59 | 55 | 3 | 1 |
@@ -134,11 +136,11 @@ The script runs every `*.bats` file in the upstream `test/system/` directory, gr
 | Systemd & Quadlet | 113 | 97 | 14 | 2 |
 | Security & Namespaces | 47 | 21 | 26 | 0 |
 | Advanced | 27 | 8 | 19 | 0 |
-| **Total** | **786** | **586** | **179** | **21** |
+| **Total** | **786** | **585** | **179** | **22** |
 
-Of the 786 tests, 179 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **607 applicable tests**: **586 pass (96.5%)** on Pass 1. The 21 residual failures are structural (`podman-testing` infra (11), timing, `slirp4netns` vs `pasta`). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
+Of the 786 tests, 179 are skipped by the test harness (`pasta` networking, SELinux, checkpoint/restore, SSH/remote — features the snap does not ship). Of the **607 applicable tests**: **585 pass (96.4%)** on Pass 1. One of the 22 failures, `037-runlabel`, is a harness artefact of the v5.8.8 run: tier 7 ran as a `systemd-run` unit with no `HOME`, and the test rejects the resulting `$HOME is not defined` warning. It passes when re-run with `HOME` set, giving an effective **586/607**. The 21 residual failures are structural (`podman-testing` infra (11), timing, `slirp4netns` vs `pasta`). See [investigations/RCCA-BATS-FAILURES.md](investigations/RCCA-BATS-FAILURES.md).
 
-The adapted shim (config env vars set conditionally, respecting pre-existing values) re-runs the config-sensitive files in Pass 2, recovering to **639/786 combined**.
+The adapted shim (config env vars set conditionally, respecting pre-existing values) re-runs the config-sensitive files in Pass 2, recovering to **638/786 combined** (639 with `037-runlabel`).
 
 ### Results — Rootless Mode (Ubuntu 24.04, VM)
 
@@ -150,19 +152,19 @@ The adapted shim (config env vars set conditionally, respecting pre-existing val
 | Volumes & Storage | 59 | 52 | 7 | 0 |
 | Networking | 111 | 20 | 2 | 89 |
 | Pods & Kube | 59 | 56 | 2 | 1 |
-| Systemd & Quadlet | 113 | 96 | 13 | 4 |
+| Systemd & Quadlet | 113 | 97 | 13 | 3 |
 | Security & Namespaces | 47 | 18 | 29 | 0 |
 | Advanced | 27 | 12 | 15 | 0 |
-| **Total** | **786** | **587** | **87** | **112** |
+| **Total** | **786** | **588** | **87** | **111** |
 
-**587/786 pass, 87 skipped, 112 failures.** However, 89 of those failures are `pasta` networking tests (`505-networking-pasta.bats` (84) + `500-networking.bats` (5)) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. Excluding `pasta`: **587/610 applicable tests (96.2%)** with 23 real failures.
+**588/786 pass, 87 skipped, 111 failures.** However, 89 of those failures are `pasta` networking tests (`505-networking-pasta.bats` (84) + `500-networking.bats` (5)) that skip in root mode but fail in rootless mode because the snap bundles `slirp4netns` instead of `pasta`. Excluding `pasta`: **588/610 applicable tests (96.4%)** with 22 real failures.
 
-Pass 2 (adapted shim, re-running config-sensitive files) recovers to **711/786 combined**. Rootless passes slightly more tests than root mode because root-only skips (e.g. `060-mount.bats`) become rootless-running tests, partly offsetting the additional `pasta` failures.
+Pass 2 (adapted shim, re-running config-sensitive files) recovers to **712/786 combined**. Rootless passes slightly more tests than root mode because root-only skips (e.g. `060-mount.bats`) become rootless-running tests, partly offsetting the additional `pasta` failures.
 
 ### Notes
 
 - **`pasta` networking tests (89 rootless, 89 root skips)** are not applicable. The snap bundles `slirp4netns` because `pasta`/`passt` is not available on the `core22` (Ubuntu 22.04) base. In root mode the test harness detects `pasta` as absent and skips them; in rootless mode it attempts to run them and they fail. These should be excluded when comparing against native _Podman_ pass rates.
-- **Adapted shim** — the shim and wrapper set `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` conditionally (`${VAR:-default}`), respecting pre-existing values. The Pass 2 re-run of config-sensitive files recovers the combined totals to 638/786 (root) and 711/786 (rootless).
+- **Adapted shim** — the shim and wrapper set `CONTAINERS_CONF`, `CONTAINERS_REGISTRIES_CONF`, and `CONTAINERS_STORAGE_CONF` conditionally (`${VAR:-default}`), respecting pre-existing values. The Pass 2 re-run of config-sensitive files recovers the combined totals to 638/786 (root) and 712/786 (rootless).
 - **Remaining snap-specific failures** are structural — `podman generate systemd` (deprecated) embeds the snap's internal binary path, and `podman-testing` runs outside the snap environment. See [investigations/RCCA-ADAPTED-FAILURES.md](investigations/RCCA-ADAPTED-FAILURES.md).
 - **`podman-testing` (11 failures)**: The binary builds but cannot find the snap's `conmon` because it runs outside the snap's environment. These are infra-structural.
 - **`conmon` upgraded to v2.0.26**: Fixes stderr data loss with large stdout volumes (`030-run.bats` test 34). See [conmon#236](https://github.com/containers/conmon/issues/236). Built from source (pre-built binaries lack journald support).
@@ -182,9 +184,11 @@ These tests can only run in a VM because they validate system-level side effects
 | 6e: Snap removal cleanup | 11 | 11/11 pass — shim, generators, quadlet, units, man pages, ldconfig, ld.so.conf.d, systemd units, DNS, systemd all clean after removal |
 | **Total** | **31** | **31/31 pass** |
 
+On v5.8.8, 6a–6d ran 20/20 on a fresh VM before Tier 7. 6e ran after Tier 7 and passed all 10 snap-artefact checks; its "no failed podman units" check failed only on the transient units the upstream BATS suite leaves behind (`container-c_*`, `podman-kube@-tmp-podman_bats.*`), the known ordering artefact described above.
+
 ## Test Environment
 
-**Bare-metal** (host environment established 2026-04-01; v5.8.6 re-validation 2026-08-15):
+**Bare-metal** (host environment established 2026-04-01; v5.8.8 re-validation 2026-10-03):
 
 - **Host**: Intel i7-8700, 125 GB RAM, Linux 6.8.0-100-generic (Ubuntu)
 - **LXD**: 5.21.4 LTS (snap)

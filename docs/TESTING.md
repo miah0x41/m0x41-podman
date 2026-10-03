@@ -9,9 +9,9 @@ The snap is validated with a seven-tier test suite. Tiers 1-5 form the core regr
 | Tier | Name | Tests | What It Validates |
 |------|------|-------|-------------------|
 | 1 | Snap Command Validation | 7 | The snap binary runs, reports correct versions, and finds all bundled components (`crun`, `netavark`, `conmon`, overlay driver, config paths) |
-| 2 | Rootless Functional | 8 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping — all as an unprivileged user |
-| 3 | Rootful Functional | 6 | Run, build, pod lifecycle, volume lifecycle — as root |
-| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.6 source tree, with `PODMAN` pointed at the snap binary |
+| 2 | Rootless Functional | 12 | Pull, run, build, pod lifecycle, volume lifecycle, DNS resolution, user namespace mapping, [security regression checks](#security-regression-checks) — all as an unprivileged user |
+| 3 | Rootful Functional | 10 | Run, build, pod lifecycle, volume lifecycle, [security regression checks](#security-regression-checks) — as root |
+| 4 | BATS Parity | 31 | Upstream _Podman_ `00*.bats` smoke tests from the v5.8.8 source tree, with `PODMAN` pointed at the snap binary |
 | 5 | Quadlet / Install Hook | 20+ | Install hook artefacts (including socket units, man pages), Quadlet dry-run, live rootful and rootless Quadlet services, upstream BATS system-service, socket-activation, and quadlet tests (gated), healthcheck transient unit validation, Go e2e quadlet tests (gated) |
 | 6 | Host-Side Impact (VM) | 25+ | Network integrity, [library path poisoning](investigations/RCCA-LIBRARY-POISONING.md), systemd health, reboot survival, snap removal cleanup — requires full VM |
 | 7 | Full Upstream BATS (on-demand) | 785 | All upstream `test/system/*.bats` files in both root and rootless modes, with categorised failure classification |
@@ -126,6 +126,18 @@ Runs all 76 upstream BATS test files in both root and rootless modes. Requires `
 /usr/bin/sg lxd -c "lxc exec snap-test-22-centos-9 -- bash"
 /usr/bin/sg lxd -c "lxc exec snap-wtest-22-debian-12 -- bash"
 ```
+
+## Security Regression Checks
+
+Tiers 2 and 3 both call `security_regressions` in `scripts/05_run_tests.sh`, which exercises the upstream security fixes in rootless and rootful mode respectively. Each check builds its own fixture locally, so none depend on a hostile registry.
+
+| Check | Upstream Fix | Fails on v5.8.6 |
+|-------|--------------|-----------------|
+| `podman run --cap-drop=ALL` on an image annotated `io.podman.annotations.checkpoint.runtime.name` exits 125 with the "must be started using `podman container restore`" error | CVE-2026-94603 (v5.8.8) | Yes: v5.8.6 tries to restore the image as a checkpoint (exit 126) |
+| `podman load` rejects an oci-archive whose `index.json` is a symlink to a file outside the archive, while the unmodified archive still loads | CVE-2025-11395 (v5.8.7) | Yes: v5.8.6 follows the symlink and loads the image |
+| `podman volume import` of a tar containing `esc -> <host dir>` followed by `esc/pwned` leaves the host directory untouched | CVE-2025-11395 (v5.8.7) | No: confinement guard; v5.8.6 already refused via chroot extraction |
+
+The first two were verified to fail against the v5.8.6 snap before being accepted, so they detect a regression to a vulnerable build rather than passing vacuously. The fixtures need GNU `tar` (for `--transform`); `scripts/07_test_setup_multi.sh` installs it on CentOS 9 Stream, which omits it, and the oci-archive check fails loudly rather than passing if the fixture could not be built.
 
 ## Writing Assertions
 
